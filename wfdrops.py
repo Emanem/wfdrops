@@ -111,7 +111,7 @@ m_rewards = {
     'Survival' : { 'rot' : ['A', 'A', 'B', 'C'], 'tm_min' : 5 },
     'Defense' : { 'rot' : ['A', 'A', 'B', 'C'], 'tm_min' : 5 },
     'Interception' : { 'rot' : ['A', 'A', 'B', 'C'], 'tm_min' : 4 },
-    'Spy' : { 'rot' : ['C'], 'tm_min' :  5 },
+    'Spy' : { 'rot' : ['A', 'B', 'C'], 'tm_min' :  4 },
     'Excavation' : { 'rot' : ['A', 'A', 'B', 'C'], 'tm_min' : 3 },
     'Exterminate' : { 'rot' : ['none'], 'tm_min' : 4 },
     'Capture' : { 'rot' : ['none'], 'tm_min' : 3 },
@@ -121,7 +121,9 @@ m_rewards = {
     'Caches' : { 'rot' : ['A', 'B', 'C'], 'tm_min' : 5 },
     'Disruption' : { 'rot' : ['B', 'B', 'C', 'C'], 'tm_min' : 5 },
     'Sabotage' : { 'rot' : ['none'], 'tm_min' : 4 },
-    'Conclave' : { 'rot' : ['A', 'B'], 'tm_min' : 10 }
+    'Conclave' : { 'rot' : ['A', 'B'], 'tm_min' : 10 },
+    'Mobile Defense' : { 'rot' : ['none'], 'tm_min' : 5 },
+    'Assassination' : { 'rot' : ['none'], 'tm_min' : 10 }
         }
 
 def type_get_odds(m_type, m_planet, m_loc, rot_map):
@@ -148,7 +150,15 @@ def type_get_odds(m_type, m_planet, m_loc, rot_map):
     return (m_type, m_planet + '/' + m_loc, odds_per_hour, total_time)
 
 def lookup_all_odds(name):
-    nm = re.compile(name, re.IGNORECASE)
+    # pick name, split by whitespaces, strip
+    # escape and surround by regex...
+    sv = name.split()
+    if len(sv) <= 0:
+        return {}
+    reg_s = ".*"
+    for i in sv:
+        reg_s += re.escape(i) + ".*"
+    nm = re.compile(reg_s, re.IGNORECASE)
     rv = {}
     for i in items_map.keys():
         is_m = nm.match(i)
@@ -275,7 +285,7 @@ class MainWin(Frame):
                 searches.pop(i)
         multi_odds = []
         for i in searches:
-            multi_odds.append(lookup_all_odds(".*" + re.escape(i.strip()) + ".*"))
+            multi_odds.append(lookup_all_odds(i.strip()))
         print("\n", multi_odds)
         label, values = combine_multi_odds(multi_odds)
         self.label_reward["text"] = label
