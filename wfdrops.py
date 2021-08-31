@@ -305,7 +305,7 @@ class MainWin(Frame):
         y_plc += 24
         self.label_reward = Label(self.master, text="", anchor=W)
         self.label_reward["font"] = font.Font(weight="bold")
-        self.label_reward.place(x=10, y=y_plc, width=256, height=24)
+        self.label_reward.place(x=10, y=y_plc, width=384, height=24)
         # init top 5 label rows
         self.res = []
         for i in range(0, max_reward_rows):
@@ -317,9 +317,9 @@ class MainWin(Frame):
             cur_l_row.append(cur_l)
             x_plc += 96
             cur_l = Label(self.master, text="BBBBB"+str(i), anchor=W)
-            cur_l.place(x=x_plc, y=y_plc, width=128, height=24)
+            cur_l.place(x=x_plc, y=y_plc, width=192, height=24)
             cur_l_row.append(cur_l)
-            x_plc += 128
+            x_plc += 192
             cur_l = Label(self.master, text="CCCCC"+str(i), anchor=E)
             cur_l.place(x=x_plc, y=y_plc, width=64, height=24)
             cur_l_row.append(cur_l)
@@ -342,7 +342,7 @@ def main():
     p.feed(htmldata)
     #lookup_print_odds('.*a5.*')
     root = Tk()
-    root.geometry("372x" + str(24*max_reward_rows + 92))
+    root.geometry("436x" + str(24*max_reward_rows + 92))
     app = MainWin(master=root)
     app.mainloop()
 
