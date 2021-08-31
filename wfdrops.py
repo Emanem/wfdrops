@@ -20,6 +20,7 @@ class MissionParser(HTMLParser):
         self.in_tr = False
         self.in_th = False
         self.in_td = False
+        self.table_name = ''
         self.planet = ''
         self.location = ''
         self.m_type = ''
@@ -45,6 +46,11 @@ class MissionParser(HTMLParser):
             self.in_th = True
         if tag == 'td':
             self.in_td = True
+        if tag == 'h3':
+            if ("id", "missionRewards") in attrs:
+                self.table_name = 'missions'
+            else:
+                self.table_name = ''
 
     def handle_endtag(self, tag):
         #print("Encountered an end tag :", tag)
@@ -55,7 +61,7 @@ class MissionParser(HTMLParser):
         if tag == 'td':
             self.in_td = False
 
-    def handle_data(self, data):
+    def handle_data_missions(self, data):
         if(self.in_tr and self.in_th):
             #print("Encountered some data  :", data)
             allm = mission_r.search(data)
@@ -90,6 +96,10 @@ class MissionParser(HTMLParser):
                     items_map[self.cur_item][self.m_type][self.planet][self.location][self.rotation] = chancef
                 # reset the item name
                 self.cur_item = ''
+
+    def handle_data(self, data):
+        if self.table_name == 'missions':
+            self.handle_data_missions(data)
     
     def set_cur_mission(self, match):
         self.planet = match.group(1)
