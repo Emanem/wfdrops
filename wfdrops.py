@@ -120,7 +120,8 @@ m_rewards = {
     'Rescue' : { 'rot' : ['C'], 'tm_min' : 4 },
     'Caches' : { 'rot' : ['A', 'B', 'C'], 'tm_min' : 5 },
     'Disruption' : { 'rot' : ['B', 'B', 'C', 'C'], 'tm_min' : 5 },
-    'Sabotage' : { 'rot' : ['none'], 'tm_min' : 4 }
+    'Sabotage' : { 'rot' : ['none'], 'tm_min' : 4 },
+    'Conclave' : { 'rot' : ['A', 'B'], 'tm_min' : 10 }
         }
 
 def type_get_odds(m_type, m_planet, m_loc, rot_map):
@@ -128,6 +129,7 @@ def type_get_odds(m_type, m_planet, m_loc, rot_map):
     # are the odds one minus not having any
     # in all runs 
     if m_rewards.get(m_type, None) is None:
+        print("Can't find type:", m_type) 
         return None
     odds_not = 1.0
     iter_r = 0
@@ -276,9 +278,9 @@ class MainWin(Frame):
             multi_odds.append(lookup_all_odds(".*" + re.escape(i.strip()) + ".*"))
         print("\n", multi_odds)
         label, values = combine_multi_odds(multi_odds)
+        self.label_reward["text"] = label
         if len(values) == 0:
             return None
-        self.label_reward["text"] = label
         self.display_rewards(values)
 
     def create_widgets(self):
