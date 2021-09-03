@@ -147,7 +147,7 @@ def type_get_odds(m_type, m_planet, m_loc, rot_map):
     hour_time = 60 / total_time
     odds_per_hour = 1.0 - math.pow(odds_not, hour_time)
     #print(m_type, m_planet, m_loc, odds_per_hour, total_time, rot_map)
-    return (m_type, m_planet + '/' + m_loc, odds_per_hour, total_time)
+    return (m_type, m_planet + '/' + m_loc, odds_per_hour, total_time, max_iter_r)
 
 def lookup_all_odds(name):
     # pick name, split by whitespaces, strip
@@ -211,7 +211,7 @@ def combine_multi_odds(s):
         cur_values = copy.deepcopy(s[idx][k])
         # make the odds reverse
         for i, v in enumerate(cur_values):
-            cur_values[i] = (v[0], v[1], 1.0 - v[2], v[3])
+            cur_values[i] = (v[0], v[1], 1.0 - v[2], v[3], v[4])
         if len(rv) <= 0:
             rv = cur_values
         else:
@@ -232,11 +232,14 @@ def combine_multi_odds(s):
                 else:
                     # amend the reverse probability
                     # and set max time
-                    rv[i] = (rv[i][0], rv[i][1], rv[i][2] * cur_values[cv[rv[i][1]]][2], max(rv[i][3], cur_values[cv[rv[i][1]]][3]))
+                    cv_var = cur_values[cv[rv[i][1]]]
+                    cv_max_tm = max(rv[i][3], cv_var[3])
+                    cv_max_iter = max(rv[i][4], cv_var[4])
+                    rv[i] = (rv[i][0], rv[i][1], rv[i][2] * cv_var[2], cv_max_tm, cv_max_iter)
         idx += 1
     # we need to reverse probabilities once more
     for i, v in enumerate(rv):
-        rv[i] = (v[0], v[1], 1.0 - v[2], v[3])
+        rv[i] = (v[0], v[1], 1.0 - v[2], v[3], v[4])
     return label, sorted(rv, key=lambda x: x[2], reverse=True) 
 
 max_reward_rows = 10 
@@ -255,6 +258,7 @@ class MainWin(Frame):
             self.res[i][1]["text"] = ""
             self.res[i][2]["text"] = ""
             self.res[i][3]["text"] = ""
+            self.res[i][4]["text"] = ""
 
     def display_rewards(self, rewards):
         for i in range(len(rewards)):
@@ -264,12 +268,14 @@ class MainWin(Frame):
             self.res[i][1]["text"] = rewards[i][1]
             self.res[i][2]["text"] = "{:5.2f}".format(100.0*rewards[i][2]) + "%"
             self.res[i][3]["text"] = str(rewards[i][3]) + " mins."
+            self.res[i][4]["text"] = rewards[i][4]
         i = len(rewards)
         while i < max_reward_rows:
             self.res[i][0]["text"] = ""
             self.res[i][1]["text"] = ""
             self.res[i][2]["text"] = ""
             self.res[i][3]["text"] = ""
+            self.res[i][4]["text"] = ""
             i += 1
 
     def search_changed(self, *args):
@@ -312,21 +318,20 @@ class MainWin(Frame):
             y_plc += 24
             x_plc = 10
             cur_l_row = []
-            cur_l = Label(self.master, text="AAAAA"+str(i), anchor=W)
-            cur_l.place(x=x_plc, y=y_plc, width=96, height=24)
-            cur_l_row.append(cur_l)
+            cur_l_row.append(Label(self.master, text="AAAAA"+str(i), anchor=W))
+            cur_l_row[-1].place(x=x_plc, y=y_plc, width=96, height=24)
             x_plc += 96
-            cur_l = Label(self.master, text="BBBBB"+str(i), anchor=W)
-            cur_l.place(x=x_plc, y=y_plc, width=192, height=24)
-            cur_l_row.append(cur_l)
+            cur_l_row.append(Label(self.master, text="BBBBB"+str(i), anchor=W))
+            cur_l_row[-1].place(x=x_plc, y=y_plc, width=192, height=24)
             x_plc += 192
-            cur_l = Label(self.master, text="CCCCC"+str(i), anchor=E)
-            cur_l.place(x=x_plc, y=y_plc, width=64, height=24)
-            cur_l_row.append(cur_l)
+            cur_l_row.append(Label(self.master, text="CCCCC"+str(i), anchor=E))
+            cur_l_row[-1].place(x=x_plc, y=y_plc, width=64, height=24)
             x_plc += 64
-            cur_l = Label(self.master, text="DDDDD"+str(i), anchor=E)
-            cur_l.place(x=x_plc, y=y_plc, width=64, height=24)
-            cur_l_row.append(cur_l)
+            cur_l_row.append(Label(self.master, text="DDDDD"+str(i), anchor=E))
+            cur_l_row[-1].place(x=x_plc, y=y_plc, width=64, height=24)
+            x_plc += 64
+            cur_l_row.append(Label(self.master, text="EEEEE"+str(i), anchor=E))
+            cur_l_row[-1].place(x=x_plc, y=y_plc, width=16, height=24)
             self.res.append(cur_l_row)
         #
         y_plc += 24
@@ -340,9 +345,8 @@ def main():
     # parse it
     p = MissionParser()
     p.feed(htmldata)
-    #lookup_print_odds('.*a5.*')
     root = Tk()
-    root.geometry("436x" + str(24*max_reward_rows + 92))
+    root.geometry("452x" + str(24*max_reward_rows + 92))
     app = MainWin(master=root)
     app.mainloop()
 
