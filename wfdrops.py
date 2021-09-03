@@ -235,7 +235,18 @@ def combine_multi_odds(s):
                     cv_var = cur_values[cv[rv[i][1]]]
                     cv_max_tm = max(rv[i][3], cv_var[3])
                     cv_max_iter = max(rv[i][4], cv_var[4])
-                    rv[i] = (rv[i][0], rv[i][1], rv[i][2] * cv_var[2], cv_max_tm, cv_max_iter)
+                    # given the mission is the same, we now need to
+                    # normalize if the numbers of tries are different
+                    # because the hourly chance% needs to be rescaled
+                    if rv[i][4] == cv_var[4]:
+                        cv_prop = rv[i][2] * cv_var[2]
+                    elif rv[i][4] > cv_var[4]:
+                        # we need to rescale cv_var[2]
+                        cv_prop = rv[i][2] * math.pow(cv_var[2], 1.0/(60/cv_var[3])*(60/rv[i][3]))
+                    else:
+                        # need to rescale rv[i][4]
+                        cv_prop = math.pow(rv[i][2], 1.0/(60/rv[i][3])*(60/cv_var[3])) * cv_var[2]
+                    rv[i] = (rv[i][0], rv[i][1], cv_prop, cv_max_tm, cv_max_iter)
         idx += 1
     # we need to reverse probabilities once more
     for i, v in enumerate(rv):
