@@ -130,7 +130,8 @@ m_rewards = {
     'Sabotage' : { 'rot' : ['none'], 'tm_min' : 4 },
     'Conclave' : { 'rot' : ['A', 'B'], 'tm_min' : 10 },
     'Mobile Defense' : { 'rot' : ['none'], 'tm_min' : 5 },
-    'Assassination' : { 'rot' : ['none'], 'tm_min' : 10 }
+    'Assassination' : { 'rot' : ['none'], 'tm_min' : 10 },
+    'Infested Salvage' : { 'rot' : ['A', 'A', 'B', 'C'], 'tm_min' : 5 }
         }
 
 def type_get_odds(m_type, m_planet, m_loc, rot_map):
