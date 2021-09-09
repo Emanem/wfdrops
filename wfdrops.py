@@ -14,6 +14,7 @@ import os.path
 mission_r = re.compile(r'([:a-z ]+)/([a-z ]+) \(([a-z ]+)\)', re.IGNORECASE)
 rotation_r = re.compile(r'rotation ([ABC])', re.IGNORECASE)
 chance_r = re.compile(r'[a-z]+ \((\d+).(\d+)\%\)', re.IGNORECASE)
+drops_url_r = re.compile(r'^http(s|)\://.*\.html$', re.IGNORECASE)
 
 # local file name holding drops
 drops_html_file = "wfdrops.html"
@@ -271,6 +272,9 @@ def parse_local_data():
     p.feed(htmldata)
 
 def update_do_closew(d_file, w):
+    if not drops_url_r.match(d_file):
+        messagebox.showerror(master=w, title="Error", message="Please spcify a valid URL for a drops html file\n(i.e. 'https://n8k6e2y6.ssl.hwcdn.net/repos/hnfvc0o3jnfvc873njb03enrf56.html')")
+        return None
     urllib.request.urlretrieve(d_file, drops_html_file)
     parse_local_data()
     w.destroy()
