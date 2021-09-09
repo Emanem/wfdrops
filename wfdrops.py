@@ -278,13 +278,14 @@ def update_do_closew(d_file, w):
 def update_popup():
     win = Toplevel()
     win.wm_title("Update Drops")
-    l = Label(win, text="Drops URL")
-    l.grid(row=0, column=0)
+    win.geometry(str(2*10 + 90 + 256) + "x" + str(2*10+24*2))
+    l = Label(win, text="Drops URL", anchor=W)
+    l.place(x=10, y=10, width=90, height=24)
     d = StringVar()
     de = Entry(win, textvariable=d)
-    de.grid(row=0, column=1)
+    de.place(x=10+90, y=10, width=256, height=24)
     b = Button(win, text="Update", command=lambda: update_do_closew(d.get(), win))
-    b.grid(row=1, column=0)
+    b.place(x=10, y=10+24, height=24)
                     
 class MainWin(Frame):
     def __init__(self, master=None):
