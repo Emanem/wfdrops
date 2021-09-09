@@ -280,6 +280,14 @@ def update_do_closew(d_file, w):
     parse_local_data()
     w.destroy()
 
+def times_do_closew(d_missions, w, sv):
+    for k in d_missions:
+        m_rewards[k]["tm_min"] = int(d_missions[k].get())
+    # this is to trigger a refresh
+    cur_se = sv.get()
+    sv.set(cur_se)
+    w.destroy()
+
 def update_popup():
     win = Toplevel()
     win.wm_title("Update Drops")
@@ -291,6 +299,29 @@ def update_popup():
     de.place(x=10+90, y=10, width=256, height=24)
     b = Button(win, text="Update", command=lambda: update_do_closew(d.get(), win))
     b.place(x=10, y=10+24, height=24)
+
+def times_popup(sv):
+    y_plc = 10
+    win = Toplevel()
+    win.wm_title("Update Times")
+    n_missions = len(m_rewards.keys())
+    win.geometry(str(2*10 + 291) + "x" + str(2*10+24*2 + 24*n_missions))
+    l = Label(win, text="Mission/Rotation average times", anchor=W)
+    l["font"] = font.Font(weight="bold")
+    l.place(x=10, y=y_plc, height=24)
+    y_plc += 24
+    # main elements
+    d_missions = {}
+    for k in m_rewards:
+        l = Label(win, text=k, anchor=W)
+        l.place(x=10, y=y_plc, height=24, width=128)
+        d_missions[k] = StringVar()
+        d_missions[k].set(m_rewards[k]["tm_min"])
+        de = Entry(win, textvariable=d_missions[k], justify=RIGHT)
+        de.place(x=10+128, y=y_plc, width=48, height=24)
+        y_plc += 24
+    b = Button(win, text="Apply/Close", command=lambda: times_do_closew(d_missions, win, sv))
+    b.place(x=10, y=y_plc, height=24)
                     
 class MainWin(Frame):
     def __init__(self, master=None):
@@ -358,6 +389,8 @@ class MainWin(Frame):
         self.search_entry.place(x=138, y=y_plc, width=128, height=24)
         self.update_btn = Button(self.master, text="Update Drops", command=update_popup)
         self.update_btn.place(x=138+128+10, y=y_plc, height=24)
+        self.times_btn = Button(self.master, text="Update Times", command=lambda: times_popup(self.search_val))
+        self.times_btn.place(x=138+128+10+128, y=y_plc, height=24)
         # 
         y_plc += 24
         self.label_reward = Label(self.master, text="", anchor=W)
@@ -392,7 +425,7 @@ class MainWin(Frame):
 
 def main():
     root = Tk()
-    root.geometry("452x" + str(24*max_reward_rows + 92))
+    root.geometry("540x" + str(24*max_reward_rows + 92))
     app = MainWin(master=root)
     app.mainloop()
 
