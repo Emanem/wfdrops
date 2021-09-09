@@ -3,14 +3,20 @@
 from html.parser import HTMLParser
 from tkinter import *
 from tkinter import font
+from tkinter import messagebox
 import re
 import math
 import copy
+import urllib.request
+import os.path
 
 # regex to match for mission titles and more
 mission_r = re.compile(r'([:a-z ]+)/([a-z ]+) \(([a-z ]+)\)', re.IGNORECASE)
 rotation_r = re.compile(r'rotation ([ABC])', re.IGNORECASE)
 chance_r = re.compile(r'[a-z]+ \((\d+).(\d+)\%\)', re.IGNORECASE)
+
+# local file name holding drops
+drops_html_file = "wfdrops.html"
 
 # main map of <item> --> <type> --> <planet> --> <location> --> <rotation> --> <chance>
 items_map = {}
@@ -253,7 +259,32 @@ def combine_multi_odds(s):
         rv[i] = (v[0], v[1], 1.0 - v[2], v[3], v[4])
     return label, sorted(rv, key=lambda x: x[2], reverse=True) 
 
-max_reward_rows = 10 
+max_reward_rows = 10
+
+def parse_local_data():
+    if not os.path.isfile(drops_html_file):
+        messagebox.showwarning(title="Warning", message="Local drop file is missing, please update drops")
+        return None
+    htmldata = open(drops_html_file, 'r').read()
+    # parse it
+    p = MissionParser()
+    p.feed(htmldata)
+
+def update_do_closew(d_file, w):
+    urllib.request.urlretrieve(d_file, drops_html_file)
+    parse_local_data()
+    w.destroy()
+
+def update_popup():
+    win = Toplevel()
+    win.wm_title("Update Drops")
+    l = Label(win, text="Drops URL")
+    l.grid(row=0, column=0)
+    d = StringVar()
+    de = Entry(win, textvariable=d)
+    de.grid(row=0, column=1)
+    b = Button(win, text="Update", command=lambda: update_do_closew(d.get(), win))
+    b.grid(row=1, column=0)
                     
 class MainWin(Frame):
     def __init__(self, master=None):
@@ -261,6 +292,7 @@ class MainWin(Frame):
         self.master = master
         self.master.title("WFDrops")
         self.create_widgets()
+        parse_local_data()
 
     def reset_rewards(self):
         self.label_reward["text"] = "(none)"
@@ -318,6 +350,8 @@ class MainWin(Frame):
         self.search_val.trace_add("write", self.search_changed)
         self.search_entry = Entry(self.master, textvariable=self.search_val)
         self.search_entry.place(x=138, y=y_plc, width=128, height=24)
+        self.update_btn = Button(self.master, text="Update Drops", command=update_popup)
+        self.update_btn.place(x=138+128+10, y=y_plc, height=24)
         # 
         y_plc += 24
         self.label_reward = Label(self.master, text="", anchor=W)
@@ -351,11 +385,6 @@ class MainWin(Frame):
         self.reset_rewards()
 
 def main():
-    # load the HTML file
-    htmldata = open('Warframe PC Drops.html', 'r').read()
-    # parse it
-    p = MissionParser()
-    p.feed(htmldata)
     root = Tk()
     root.geometry("452x" + str(24*max_reward_rows + 92))
     app = MainWin(master=root)
