@@ -396,6 +396,24 @@ class MainWin(Frame):
         self.label_reward = Label(self.master, text="", anchor=W)
         self.label_reward["font"] = font.Font(weight="bold")
         self.label_reward.place(x=10, y=y_plc, width=384, height=24)
+        # set the titles
+        y_plc += 24
+        x_plc = 10
+        cur_l_row = []
+        cur_l_row.append(Label(self.master, text="Mission Type", fg="blue", anchor=W))
+        cur_l_row[-1].place(x=x_plc, y=y_plc, width=96, height=24)
+        x_plc += 96
+        cur_l_row.append(Label(self.master, text="Location", fg="blue", anchor=W))
+        cur_l_row[-1].place(x=x_plc, y=y_plc, width=192, height=24)
+        x_plc += 192
+        cur_l_row.append(Label(self.master, text="Drop %", fg="blue", anchor=W))
+        cur_l_row[-1].place(x=x_plc, y=y_plc, width=64, height=24)
+        x_plc += 64
+        cur_l_row.append(Label(self.master, text="Run Time", fg="blue", anchor=E))
+        cur_l_row[-1].place(x=x_plc, y=y_plc, width=64, height=24)
+        x_plc += 64
+        cur_l_row.append(Label(self.master, text="Iter.", fg="blue", anchor=E))
+        cur_l_row[-1].place(x=x_plc, y=y_plc, width=48, height=24)
         # init top 5 label rows
         self.res = []
         for i in range(0, max_reward_rows):
@@ -408,14 +426,14 @@ class MainWin(Frame):
             cur_l_row.append(Label(self.master, text="BBBBB"+str(i), anchor=W))
             cur_l_row[-1].place(x=x_plc, y=y_plc, width=192, height=24)
             x_plc += 192
-            cur_l_row.append(Label(self.master, text="CCCCC"+str(i), anchor=E))
+            cur_l_row.append(Label(self.master, text="CCCCC"+str(i), anchor=W))
             cur_l_row[-1].place(x=x_plc, y=y_plc, width=64, height=24)
             x_plc += 64
             cur_l_row.append(Label(self.master, text="DDDDD"+str(i), anchor=E))
             cur_l_row[-1].place(x=x_plc, y=y_plc, width=64, height=24)
             x_plc += 64
             cur_l_row.append(Label(self.master, text="EEEEE"+str(i), anchor=E))
-            cur_l_row[-1].place(x=x_plc, y=y_plc, width=16, height=24)
+            cur_l_row[-1].place(x=x_plc, y=y_plc, width=48, height=24)
             self.res.append(cur_l_row)
         #
         y_plc += 24
@@ -425,7 +443,7 @@ class MainWin(Frame):
 
 def main():
     root = Tk()
-    root.geometry("540x" + str(24*max_reward_rows + 92))
+    root.geometry("540x" + str(24*max_reward_rows + 92 + 24))
     app = MainWin(master=root)
     app.mainloop()
 
