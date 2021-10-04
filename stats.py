@@ -19,34 +19,63 @@ def coumpound_all_prob(prob_list):
     return total_prob
 
 def coumpound_all_prob_fact(prob_list, tries):
+    if(tries < len(prob_list)):
+        return None
     total_prob = 1.0
     for i in prob_list:
         total_prob *= i
-    return total_prob * math.factorial(len(prob_list))
+    base_prob = total_prob * math.factorial(len(prob_list))
+    accum_mult = 1.0
+    rem_prob = 1.0 - sum(prob_list)
+    print(rem_prob)
+    for i in range(tries - len(prob_list)):
+        for j in prob_list:
+            accum_mult += j
+        accum_mult += rem_prob
+    print(accum_mult)
+    return accum_mult * base_prob
+
+def single_run_mc(prob_list, tries):
+    # build a simple list with cumulated values
+    accum = 0.0
+    a_pl = []
+    res_pl = []
+    for i in prob_list:
+        accum += i
+        a_pl.append(accum)
+        res_pl.append(0)
+    #print(a_pl)
+    for i in range(tries):
+        cr = random.randint(1, 1000000)/1000000.0
+        #print(cr)
+        for j in range(len(a_pl)):
+            if cr <= a_pl[j]:
+                res_pl[j] = 1
+                break
+    #print(res_pl)
+    accum = 0
+    for i in res_pl:
+        accum += i
+    #print(accum >= len(res_pl), "\n")
+    return accum >= len(res_pl)
 
 def coumpound_all_prob_mc(prob_list, tries):
+    if(tries < len(prob_list)):
+        return None
     total_ok = 0
-    samples = 100000
+    samples = 10000000
     i = 0
     while i < samples:
-        # evaluate prob list
-        good = True
-        for j in prob_list:
-            cr = random.randint(0, 10000)/10000.0
-            if cr > j:
-                good = False
-                break
-        if good:
-            total_ok += 1
+        total_ok += 1 if single_run_mc(prob_list, tries) else 0
         i += 1
-    return 1.0 * total_ok / samples * 6
+    return 1.0 * total_ok / samples
 
 def main():
     mv = [0.3872, 0.3872, 0.2256]
-    #mv = [0.25, 0.25, 0.5]
-    print(coumpound_all_prob(mv))
-    print(coumpound_all_prob_fact(mv, len(mv)))
-    print(coumpound_all_prob_mc(mv, len(mv)))
+    #mv = [0.1, 0.1, 0.1]
+    n_tries = 4
+    print(coumpound_all_prob_fact(mv, n_tries))
+    print(coumpound_all_prob_mc(mv, n_tries))
 
 if __name__ == "__main__":
     main()
