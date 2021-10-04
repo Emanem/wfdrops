@@ -15,12 +15,16 @@ mission_r = re.compile(r'([:a-z ]+)/([a-z ]+) \(([a-z ]+)\)', re.IGNORECASE)
 rotation_r = re.compile(r'rotation ([ABC])', re.IGNORECASE)
 chance_r = re.compile(r'[a-z]+ \((\d+).(\d+)\%\)', re.IGNORECASE)
 drops_url_r = re.compile(r'^http(s|)\://.*\.html$', re.IGNORECASE)
+mods_drop_r = re.compile(r'mod drop chance\: (\d+).(\d+)\%', re.IGNORECASE)
 
 # local file name holding drops
 drops_html_file = "wfdrops.html"
 
 # main map of <item> --> <type> --> <planet> --> <location> --> <rotation> --> <chance>
 items_map = {}
+
+# secondary maps of <mod> --> <source (enemy)> --> <chance>
+mods_map = {}
 
 class MissionParser(HTMLParser):
     def __init__(self):
@@ -33,6 +37,9 @@ class MissionParser(HTMLParser):
         self.m_type = ''
         self.rotation = 'none'
         self.cur_item = ''
+        self.mod_source = ''
+        self.mod_source_chance = 0.0
+        self.mod_name = ''
         super().__init__()
 
     def handle_starttag(self, tag, attrs):
@@ -49,6 +56,9 @@ class MissionParser(HTMLParser):
                 self.m_type = ''
                 self.rotation = 'none'
                 self.cur_item = ''
+                self.mod_source = ''
+                self.mod_source_chance = 0.0
+                self.mod_name = ''
         if tag == 'th':
             self.in_th = True
         if tag == 'td':
@@ -56,6 +66,8 @@ class MissionParser(HTMLParser):
         if tag == 'h3':
             if ("id", "missionRewards") in attrs:
                 self.table_name = 'missions'
+            elif ("id", "modByAvatar") in attrs:
+                self.table_name = 'mba'
             else:
                 self.table_name = ''
 
@@ -104,9 +116,33 @@ class MissionParser(HTMLParser):
                 # reset the item name
                 self.cur_item = ''
 
+    def handle_data_mods(self, data):
+        if(self.in_tr and self.in_th):
+            if(len(self.mod_source) == 0):
+                self.mod_source = data
+            else:
+                mdc = mods_drop_r.search(data)
+                if (mdc is not None):
+                    self.mod_source_chance = float(mdc.group(1)) + float(mdc.group(2))/100.0
+        elif (self.in_tr and self.in_td and len(self.mod_source)>0 and len(data) > 0):
+            if(len(self.mod_name) == 0):
+                self.mod_name = data
+            else:
+                # get the chance of given mod
+                chancem = chance_r.search(data)
+                if (chancem is not None):
+                    chancef = float(chancem.group(1)) + float(chancem.group(2))/100.0
+                    # add to multi level map
+                    if mods_map.get(self.mod_name, None) is None:
+                        mods_map[self.mod_name] = {}
+                    mods_map[self.mod_name][self.mod_source] = self.mod_source_chance/100.0 * chancef
+                self.mod_name = ''
+
     def handle_data(self, data):
         if self.table_name == 'missions':
             self.handle_data_missions(data)
+        elif self.table_name == 'mba':
+            self.handle_data_mods(data)
     
     def set_cur_mission(self, match):
         self.planet = match.group(1)
