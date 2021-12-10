@@ -24,16 +24,13 @@ def coumpound_all_prob_fact(prob_list, tries):
     total_prob = 1.0
     for i in prob_list:
         total_prob *= i
-    base_prob = total_prob * math.factorial(len(prob_list))
-    accum_mult = 1.0
-    rem_prob = 1.0 - sum(prob_list)
-    print(rem_prob)
+    accum_mult = 0.0
     for i in range(tries - len(prob_list)):
         for j in prob_list:
-            accum_mult += j
-        accum_mult += rem_prob
-    print(accum_mult)
-    return accum_mult * base_prob
+            accum_mult += math.pow(j, 1.0+i)
+    fact_num = math.factorial(tries) / math.factorial(1+tries-len(prob_list))
+    print(total_prob, accum_mult, tries, fact_num)
+    return accum_mult * total_prob * fact_num
 
 def single_run_mc(prob_list, tries):
     # build a simple list with cumulated values
@@ -63,7 +60,7 @@ def coumpound_all_prob_mc(prob_list, tries):
     if(tries < len(prob_list)):
         return None
     total_ok = 0
-    samples = 10000000
+    samples = 1000000
     i = 0
     while i < samples:
         total_ok += 1 if single_run_mc(prob_list, tries) else 0
@@ -73,7 +70,7 @@ def coumpound_all_prob_mc(prob_list, tries):
 def main():
     mv = [0.3872, 0.3872, 0.2256]
     #mv = [0.1, 0.1, 0.1]
-    n_tries = 4
+    n_tries = 5
     print(coumpound_all_prob_fact(mv, n_tries))
     print(coumpound_all_prob_mc(mv, n_tries))
 
