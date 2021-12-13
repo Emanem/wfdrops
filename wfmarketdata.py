@@ -6,6 +6,8 @@ from urllib.request import urlopen as req_url
 import json
 import sqlite3
 import time
+import getopt
+import sys
 
 # Extract all the sell of online players
 def getsell(orders):
@@ -70,6 +72,37 @@ wf_names = [
     "frost",
 ]
 
+# do extract and print to std out
+def doextract():
+    con = sqlite3.connect('wf_items.db')
+    cur = con.cursor()
+    citems = cur.execute("SELECT ts, item, MIN(plat) as plat FROM wf_items GROUP BY item, ts")
+    alldata = {}
+    allitems = {}
+    for i in citems:
+        if alldata.get(i[0]) is None:
+            alldata[i[0]] = {}
+        alldata[i[0]][i[1]] = i[2]
+        allitems[i[1]] = 1
+    con.close()
+    # now print all
+    # first header
+    itemsarr = allitems.keys()
+    print("Timestamp", sep='', end='')
+    for k in itemsarr:
+        print(",", k, sep='', end='')
+    print('')
+    # then all data
+    for k, v in alldata.items():
+        print(k, end='')
+        for i in itemsarr:
+            if v.get(i) is None:
+                print(",", end='')
+            else:
+                print(",", v[i], sep='', end='')
+        print('')
+    return None
+
 # get full list of wf items/parts
 def getwfitems():
     ret = []
@@ -79,10 +112,25 @@ def getwfitems():
     return ret
 
 def main():
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "e", ["extract"])
+    except getopt.GetoptError as err:
+        print(err)
+        sys.exit(-1)
+    extract = False
+    for o, a in opts:
+        if o in ("-e", "--extract"):
+            extract = True
+        else:
+            assert False, "unhandled option"
+    # if we're in extract mode just extract, print and quit
+    if extract:
+        doextract()
+        sys.exit(0)
     # 1 get all the quotes
     aq = {}
     for i in getwfitems():
-        print("Getting data for '", i, "'...")
+        print("Getting data for '", i, "'...", sep='')
         aq[i] = getquotes(i)
         time.sleep(1)
     # 2 print all
