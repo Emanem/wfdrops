@@ -30,16 +30,36 @@ def getquotes(search):
     parsed = json.loads(data)
     return getsell(parsed["payload"]["orders"])
 
+# Ensure a normalized table of strings is properly initialized and setup
+# returns the k/v pair
+def add_all_strings(db, nm, tab_name):
+    cur = db.cursor()
+    cur.execute("CREATE TABLE IF NOT EXISTS " + tab_name + " (v text)")
+    for i in nm:
+        q = "INSERT INTO " + tab_name + "(v) SELECT '" + i + "' WHERE NOT EXISTS (SELECT 1 FROM " + tab_name + " WHERE v='" + i + "')";
+        cur.execute(q)
+    db.commit()
+    rv = {}
+    ri = cur.execute("SELECT MAX(rowid) as id, v FROM " + tab_name + " WHERE 1=1 GROUP BY v")
+    for i in ri:
+        rv[i[1]] = i[0]
+    return rv
+
 # store in SQL DB
 def storesql(con, aq):
     cur = con.cursor()
+    # add the 'now' string
     cdt = cur.execute("SELECT datetime('now')")
     for i in cdt:
         dt = i[0]
-    cur.execute("CREATE TABLE IF NOT EXISTS wf_items (ts text, item text, plat integer, qty integer, user text)")
+    r_ts = add_all_strings(con, [dt], "ts_value")
+    # add all the items
+    r_item = add_all_strings(con, list(aq.keys()), "item_value")
+    # then main table
+    cur.execute("CREATE TABLE IF NOT EXISTS wf_items (ts integer, item integer, plat integer, qty integer, user text)")
     for k, v in aq.items():
         for i in v:
-            cur.execute("INSERT INTO wf_items VALUES(?, ?, ?, ?, ?)", (dt, k, i[0], i[1], i[2]))
+            cur.execute("INSERT INTO wf_items VALUES(?, ?, ?, ?, ?)", (r_ts[dt], r_item[k], i[0], i[1], i[2]))
     con.commit()
 
 # all the pieces and wf I'm tracking
@@ -73,10 +93,9 @@ wf_names = [
 ]
 
 # do extract and print to std out
-def doextract():
-    con = sqlite3.connect('wf_items.db')
+def doextract(con):
     cur = con.cursor()
-    citems = cur.execute("SELECT ts, item, MIN(plat) as plat FROM wf_items GROUP BY item, ts")
+    citems = cur.execute("SELECT t.v as ts, i.v as item, MIN(w.plat) as plat FROM wf_items w JOIN ts_value t ON (t.rowid=w.ts) JOIN item_value i ON (i.rowid=w.item) GROUP BY i.v, t.v")
     alldata = {}
     allitems = {}
     for i in citems:
@@ -84,7 +103,6 @@ def doextract():
             alldata[i[0]] = {}
         alldata[i[0]][i[1]] = i[2]
         allitems[i[1]] = 1
-    con.close()
     # now print all
     # first header
     itemsarr = allitems.keys()
@@ -125,7 +143,9 @@ def main():
             assert False, "unhandled option"
     # if we're in extract mode just extract, print and quit
     if extract:
-        doextract()
+        con = sqlite3.connect('wf_items_ext.db')
+        doextract(con)
+        con.close()
         sys.exit(0)
     # 1 get all the quotes
     aq = {}
@@ -136,7 +156,7 @@ def main():
     # 2 print all
     print(aq)
     # 3 open sql DB and insert data
-    con = sqlite3.connect('wf_items.db')
+    con = sqlite3.connect('wf_items_ext.db')
     storesql(con, aq)
     con.close()
 
