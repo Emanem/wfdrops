@@ -8,6 +8,7 @@ import sqlite3
 import time
 import getopt
 import sys
+import re
 
 # Extract all the sell of online players
 def getsell(orders):
@@ -93,7 +94,10 @@ wf_names = [
 ]
 
 # do extract and print to std out
-def doextract(con):
+def doextract(con, items):
+    r_items = []
+    for s in items.split(","):
+        r_items.append(re.compile(r'.*' + re.escape(s.strip()) + r'.*', re.IGNORECASE))
     cur = con.cursor()
     citems = cur.execute("SELECT t.v as ts, i.v as item, MIN(w.plat) as plat FROM wf_items w JOIN ts_value t ON (t.rowid=w.ts) JOIN item_value i ON (i.rowid=w.item) GROUP BY i.v, t.v")
     alldata = {}
@@ -103,9 +107,18 @@ def doextract(con):
             alldata[i[0]] = {}
         alldata[i[0]][i[1]] = i[2]
         allitems[i[1]] = 1
+    # select required items
+    itemsarr = []
+    if not r_items:
+        itemsarr = allitems.keys()
+    else:
+        for ci in allitems.keys():
+            for r in r_items:
+                if r.match(ci) is not None:
+                    itemsarr.append(ci)
+                    break
     # now print all
     # first header
-    itemsarr = allitems.keys()
     print("Timestamp", sep='', end='')
     for k in itemsarr:
         print(",", k, sep='', end='')
@@ -131,20 +144,25 @@ def getwfitems():
 
 def main():
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "e", ["extract"])
+        opts, args = getopt.getopt(sys.argv[1:], "ei:", ["extract-all", "items="])
     except getopt.GetoptError as err:
         print(err)
         sys.exit(-1)
     extract = False
+    items = ""
     for o, a in opts:
-        if o in ("-e", "--extract"):
+        if o in ("-e", "--extract-all"):
             extract = True
+        elif o in ("-i", "--items"):
+            items = a
+            if (not extract):
+                extract = True
         else:
             assert False, "unhandled option"
     # if we're in extract mode just extract, print and quit
     if extract:
         con = sqlite3.connect('wf_items_ext.db')
-        doextract(con)
+        doextract(con, items)
         con.close()
         sys.exit(0)
     # 1 get all the quotes
@@ -152,7 +170,7 @@ def main():
     for i in getwfitems():
         print("Getting data for '", i, "'...", sep='')
         aq[i] = getquotes(i)
-        time.sleep(1)
+        time.sleep(0.25)
     # 2 print all
     print(aq)
     # 3 open sql DB and insert data
