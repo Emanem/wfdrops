@@ -148,17 +148,21 @@ def doavgextract(con, items):
         q = """
 SELECT i.v AS 'item', AVG(plat) AS 'plat'
 FROM (
-	SELECT	ts, item, MIN(plat) as 'plat'
-	FROM	wf_items
-	GROUP BY ts, item
+	SELECT DATE(ts) AS ts, item, AVG(plat) as 'plat'
+	FROM (
+		SELECT	t.v AS ts, item, MIN(plat) as 'plat'
+		FROM	wf_items i
+		JOIN	ts_value t
+		ON (i.ts=t.ROWID)
+		GROUP BY t.v, i.item
+	) z
+	GROUP BY DATE(z.ts), z.item
 ) x
-JOIN ts_value t
-ON (x.ts=t.ROWID)
 JOIN item_value i
 ON (x.item = i.ROWID)
 WHERE 1=1
-AND t.v >= datetime('now', '-{period:d} day')
-AND t.v <= datetime('now')
+AND x.ts >= datetime('now', '-{period:d} day')
+AND x.ts <= datetime('now')
 GROUP BY x.item
         """
         citems = cur.execute(q.format(period=p))
