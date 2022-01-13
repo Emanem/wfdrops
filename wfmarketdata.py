@@ -134,6 +134,66 @@ def doextract(con, items):
         print('')
     return None
 
+# do averages extract and print to std out
+def doavgextract(con, items):
+    r_items = []
+    for s in items.split(","):
+        r_items.append(re.compile(r'.*' + re.escape(s.strip()) + r'.*', re.IGNORECASE))
+    cur = con.cursor()
+    alldata = {}
+    allitems = {}
+    periods = [1, 3, 7, 10, 14, 28, 180]
+    # iterate through periods
+    for p in periods:
+        q = """
+SELECT i.v AS 'item', AVG(plat) AS 'plat'
+FROM (
+	SELECT	ts, item, MIN(plat) as 'plat'
+	FROM	wf_items
+	GROUP BY ts, item
+) x
+JOIN ts_value t
+ON (x.ts=t.ROWID)
+JOIN item_value i
+ON (x.item = i.ROWID)
+WHERE 1=1
+AND t.v >= datetime('now', '-{period:d} day')
+AND t.v <= datetime('now')
+GROUP BY x.item
+        """
+        citems = cur.execute(q.format(period=p))
+        alldata[p] = {}
+        for i in citems:
+            alldata[p][i[0]] = i[1]
+            allitems[i[0]] = 1
+    # select required items
+    itemsarr = []
+    if not r_items:
+        itemsarr = allitems.keys()
+    else:
+        for ci in allitems.keys():
+            for r in r_items:
+                if r.match(ci) is not None:
+                    itemsarr.append(ci)
+                    break
+    # now print all
+    # first header
+    print("Avg Period", sep='', end='')
+    for k in itemsarr:
+        print(",", k, sep='', end='')
+    print('')
+    # then all data
+    for k, v in alldata.items():
+        print(k, end='')
+        for i in itemsarr:
+            if v.get(i) is None:
+                print(",", end='')
+            else:
+                print(",", v[i], sep='', end='')
+        print('')
+    return None
+
+
 # get full list of wf items/parts
 def getwfitems():
     ret = []
@@ -144,11 +204,12 @@ def getwfitems():
 
 def main():
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "ei:", ["extract-all", "items="])
+        opts, args = getopt.getopt(sys.argv[1:], "aei:", ["avg-extract", "extract-all", "items="])
     except getopt.GetoptError as err:
         print(err)
         sys.exit(-1)
     extract = False
+    avg_extract = False
     items = ""
     for o, a in opts:
         if o in ("-e", "--extract-all"):
@@ -157,12 +218,19 @@ def main():
             items = a
             if (not extract):
                 extract = True
+        elif o in ("-a", "--avg-extract"):
+            avg_extract = True
+            if (not extract):
+                extract = True
         else:
             assert False, "unhandled option"
     # if we're in extract mode just extract, print and quit
     if extract:
         con = sqlite3.connect('wf_items_ext.db')
-        doextract(con, items)
+        if avg_extract:
+            doavgextract(con, items)
+        else:
+            doextract(con, items)
         con.close()
         sys.exit(0)
     # 1 get all the quotes
