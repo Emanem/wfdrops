@@ -16,6 +16,7 @@ G_DB_NAME = "wf_mkt_hist.db"
 G_DB_ITEMS_NAME = "items"
 G_DB_ITEMS_HIST = "hist"
 G_WFM_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36'
+G_SLEEP_THROTTLE = 1.0
 
 def db_setup(db):
     cur = db.cursor()
@@ -100,11 +101,17 @@ def store_hist_data(item_names):
         tm_start = time.monotonic()
         try:
             all_items[nm] = get_hist_stats(nm)
-        except:
-            print("Error, carrying on")
+        except Exception as e:
+            print("Error, carrying on (", e, ")")
         else:
+            # this is not great - but it does work...
             tm_end = time.monotonic()
             print('done', tm_end-tm_start, 's')
+        finally:
+            tm_end = time.monotonic()
+            sleep_throttle = G_SLEEP_THROTTLE - (tm_end - tm_start)
+            if sleep_throttle > 0.0:
+                time.sleep(sleep_throttle)
     db = sqlite3.connect(G_DB_NAME)
     db_setup(db)
     rv = db_insert_raw_data(db, all_items)
