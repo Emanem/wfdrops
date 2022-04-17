@@ -8,10 +8,12 @@ from lxml import html
 import json
 import sqlite3
 import getopt
+import re
 
 G_DB_NAME = "wf_mkt_hist.db"
 G_DB_ITEMS_NAME = "items"
 G_DB_ITEMS_HIST = "hist"
+G_WFM_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36'
 
 def db_setup(db):
     cur = db.cursor()
@@ -74,15 +76,18 @@ def parse_hist_stats(data):
             rv.append((datetime.datetime.fromisoformat(x['datetime']), int(x['volume']), int(x['min_price']), int(x['max_price']), int(x['open_price']), int(x['closed_price']), float(x['avg_price']), float(x['wa_price']), float(x['median']), float(x['moving_avg'])))
     return rv
 
-def get_hist_stats(item_name):
+def get_wfm_webapi(str_url):
     # ignore certificate - I know it's not great
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
-    str_url = 'https://warframe.market/items/' + item_name.replace(' ', '_').lower() + '/statistics'
-    req = urllib.request.Request(str_url, data=None, headers={'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36'})
+    req = urllib.request.Request(str_url, data=None, headers={'User-Agent': G_WFM_USER_AGENT})
     f = urllib.request.urlopen(req, context=ctx)
-    data = f.read().decode('utf-8')
+    return f.read().decode('utf-8')
+
+def get_hist_stats(item_name):
+    str_url = 'https://warframe.market/items/' + item_name.replace(' ', '_').lower() + '/statistics'
+    data = get_wfm_webapi(str_url)
     return parse_hist_stats(data)
 
 def store_hist_data(item_names):
@@ -95,11 +100,29 @@ def store_hist_data(item_names):
     db.close()
     return rv
 
+def get_items_list(search_nm):
+    str_url = 'https://api.warframe.market/v1/items'
+    data = get_wfm_webapi(str_url)
+    jdata = json.loads(data)
+    r_items = []
+    for s in search_nm:
+        r_items.append(re.compile(r'.*' + re.escape(s.strip()) + r'.*', re.IGNORECASE))
+    rv = {}
+    for k in jdata['payload']['items']:
+        for r_i in r_items:
+            if r_i.match(k['item_name']) is not None:
+                rv[k['item_name']] = 0
+    return list(rv.keys())
+
 def main():
-    items = ["Galvanized Acceleration"]
-    rv = store_hist_data(items)
-    print("\tAdded:")
-    print(rv)
+    l_items = get_items_list(['galvanized'])
+    print("\tAdding/Updating:")
+    for i in l_items:
+        print(i)
+    rv = store_hist_data(l_items)
+    print("\tEntries added:")
+    for i in rv:
+        print(i, rv[i])
 
 if __name__ == "__main__":
     main()
