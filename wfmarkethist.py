@@ -89,7 +89,7 @@ def get_wfm_webapi(str_url):
     return f.read().decode('utf-8')
 
 def get_hist_stats(item_name):
-    str_url = 'https://warframe.market/items/' + item_name.replace(' ', '_').lower() + '/statistics'
+    str_url = 'https://warframe.market/items/' + item_name.replace('&', 'and').replace('-', '_').replace(' ', '_').lower() + '/statistics'
     data = get_wfm_webapi(str_url)
     return parse_hist_stats(data)
 
