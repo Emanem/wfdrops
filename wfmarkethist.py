@@ -8,7 +8,9 @@ from lxml import html
 import json
 import sqlite3
 import getopt
+import sys
 import re
+import time
 
 G_DB_NAME = "wf_mkt_hist.db"
 G_DB_ITEMS_NAME = "items"
@@ -73,7 +75,7 @@ def parse_hist_stats(data):
             # skip fully upgraded mods
             if x.get('mod_rank', 0) != 0:
                 continue
-            rv.append((datetime.datetime.fromisoformat(x['datetime']), int(x['volume']), int(x['min_price']), int(x['max_price']), int(x['open_price']), int(x['closed_price']), float(x['avg_price']), float(x['wa_price']), float(x['median']), float(x['moving_avg'])))
+            rv.append((datetime.datetime.fromisoformat(x['datetime']), int(x['volume']), int(x['min_price']), int(x['max_price']), int(x['open_price']), int(x['closed_price']), float(x['avg_price']), float(x['wa_price']), float(x['median']), float(x.get('moving_avg', 0.0))))
     return rv
 
 def get_wfm_webapi(str_url):
@@ -91,9 +93,18 @@ def get_hist_stats(item_name):
     return parse_hist_stats(data)
 
 def store_hist_data(item_names):
+    print("\tFetching:")
     all_items = {}
     for nm in item_names:
-        all_items[nm] = get_hist_stats(nm)
+        print(nm, end='...')
+        tm_start = time.monotonic()
+        try:
+            all_items[nm] = get_hist_stats(nm)
+        except:
+            print("Error, carrying on")
+        else:
+            tm_end = time.monotonic()
+            print('done', tm_end-tm_start, 's')
     db = sqlite3.connect(G_DB_NAME)
     db_setup(db)
     rv = db_insert_raw_data(db, all_items)
@@ -115,14 +126,42 @@ def get_items_list(search_nm):
     return list(rv.keys())
 
 def main():
-    l_items = get_items_list(['galvanized'])
-    print("\tAdding/Updating:")
-    for i in l_items:
-        print(i)
-    rv = store_hist_data(l_items)
-    print("\tEntries added:")
-    for i in rv:
-        print(i, rv[i])
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "ueh", ["update", "extract", "help", "values="])
+    except getopt.GetoptError as err:
+        print(err)
+        sys.exit(-1)
+    do_update = True
+    for o, a in opts:
+        if o in ("-u", "--update"):
+            do_update = True
+        elif o in ("-e", "--extract"):
+            do_update = False
+        elif o in ("-h", "--help"):
+            print(sys.argv[0], "Update and/or Extract Warframe Market historic price data")
+            print('''
+Usage: (options) item1, item2, ...
+
+-u, --update    Add/update the given items to the local SQLite database
+                This is the default operation mode
+-e, --extract   Extract historic price data for the given items from the
+                local SQLite database
+--values v1,..  Specify which price item values to be extracted; by default
+                all below values would be extracted
+            ''')
+            sys.exit(0)
+    # args should contain the list of items to extract/update
+    if do_update:
+        l_items = get_items_list(args)
+        print("\tAdding/Updating:")
+        for i in l_items:
+            print(i)
+        rv = store_hist_data(l_items)
+        print("\tEntries added:")
+        for i in rv:
+            print(i, rv[i])
+    else:
+        print('abc')
 
 if __name__ == "__main__":
     main()
