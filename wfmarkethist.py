@@ -133,9 +133,15 @@ def get_items_list(search_nm):
                 rv[k['item_name']] = 0
     return list(rv.keys())
 
-def do_extract(search_nm):
+def do_extract(search_nm, e_values):
     query = """
-SELECT  i.name as name, h.ts as ts, h.volume as volume, h.min as min
+SELECT  i.name as name, h.ts as ts
+"""
+    values_q = ""
+    for v in e_values:
+        values_q += ", h." + v + " as " + v
+    query += values_q
+    query += """
 FROM    items i
 JOIN    hist h
 ON      (i.rowid=h.id)
@@ -152,9 +158,51 @@ AND     (
     db_setup(db)
     cur = db.cursor()
     ri = cur.execute(query)
+    rv = {}
     for v in ri:
-        print(v)
+        cd = datetime.datetime.fromisoformat(v[1])
+        ci = v[0]
+        if cd not in rv:
+            rv[cd] = {}
+        if ci not in rv[cd]:
+            rv[cd][ci] = {}
+        for i in range(len(e_values)):
+            rv[cd][ci][e_values[i]] = v[2+i]
     db.close()
+    return rv
+
+def do_extract_printout(ev, e_values):
+    # find all the items we have managed to extract
+    all_items = {}
+    for k, v in ev.items():
+        for i in v.keys():
+            all_items[i] = 0
+    # first print header
+    print("timestamp", end='')
+    for i in all_items.keys():
+        for v in e_values:
+            print("," + i + " [" + v + "]", sep='', end='')
+    print()
+    # lambda to lookup values
+    def lookup_fn(ts, item, val):
+        if ts not in ev:
+            return None
+        if item not in ev[ts]:
+            return None
+        if val not in ev[ts][item]:
+            return None
+        return ev[ts][item][val]
+    # finally print out everything
+    for t in ev.keys():
+        print(t, end='')
+        for i in all_items.keys():
+            for v in e_values:
+                val = lookup_fn(t, i, v)
+                if val is None:
+                    print(",", end='')
+                else:
+                    print(",", val, sep='', end='')
+        print()
 
 def main():
     try:
@@ -163,6 +211,7 @@ def main():
         print(err)
         sys.exit(-1)
     exec_mode = 'u'
+    extract_values = ['volume', 'min', 'max', 'open', 'close', 'avg', 'w_avg', 'median', 'm_avg']
     for o, a in opts:
         if o in ("-u", "--update"):
             exec_mode = 'u'
@@ -183,10 +232,28 @@ Usage: (options) item1, item2, ...
 
 --values v1,..  Specify which price item values to be extracted; by default
                 all below values would be extracted
+                - volume
+                - min
+                - max
+                - open
+                - close
+                - avg
+                - w_avg
+                - median
+                - m_avg
+                Specifying any value using this option implies option '-e'
 
 -s, --search    Search remote warframe market for given items
             ''')
             sys.exit(0)
+        elif o in ("--values"):
+            exec_mode = 'e'
+            s_e_values = a.split(",")
+            for s in s_e_values:
+                if s not in extract_values:
+                    print("Invalid value '" + s + "' specified in extraction")
+                    sys.exit(-1)
+            extract_values = s_e_values
     # args should contain the list of items to extract/update
     if exec_mode == 'u':
         l_items = get_items_list(args)
@@ -198,7 +265,8 @@ Usage: (options) item1, item2, ...
         for i in rv:
             print(i, rv[i])
     elif exec_mode == 'e':
-        do_extract(args)
+        ev = do_extract(args, extract_values)
+        do_extract_printout(ev, extract_values)
     elif exec_mode == 's':
         l_items = get_items_list(args)
         print("\tSearch:")
