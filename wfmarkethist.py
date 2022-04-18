@@ -177,10 +177,14 @@ Usage: (options) item1, item2, ...
 
 -u, --update    Add/update the given items to the local SQLite database
                 This is the default operation mode
+
 -e, --extract   Extract historic price data for the given items from the
                 local SQLite database
+
 --values v1,..  Specify which price item values to be extracted; by default
                 all below values would be extracted
+
+-s, --search    Search remote warframe market for given items
             ''')
             sys.exit(0)
     # args should contain the list of items to extract/update
@@ -196,7 +200,10 @@ Usage: (options) item1, item2, ...
     elif exec_mode == 'e':
         do_extract(args)
     elif exec_mode == 's':
-        print('search')
+        l_items = get_items_list(args)
+        print("\tSearch:")
+        for i in l_items:
+            print(i)
 
 if __name__ == "__main__":
     main()
