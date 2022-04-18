@@ -22,6 +22,7 @@ def db_setup(db):
     cur = db.cursor()
     cur.execute("CREATE TABLE IF NOT EXISTS " + G_DB_ITEMS_NAME + " (name text)")
     cur.execute("CREATE TABLE IF NOT EXISTS " + G_DB_ITEMS_HIST + " (id integer, ts timestamp, volume integer, min integer, max integer, open integer, close integer, avg real, w_avg real, median real, m_avg real)")
+    cur.execute("CREATE INDEX IF NOT EXISTS i1 ON " + G_DB_ITEMS_HIST + "(id)")
     db.commit()
     return None
 
@@ -132,18 +133,43 @@ def get_items_list(search_nm):
                 rv[k['item_name']] = 0
     return list(rv.keys())
 
+def do_extract(search_nm):
+    query = """
+SELECT  i.name as name, h.ts as ts, h.volume as volume, h.min as min
+FROM    items i
+JOIN    hist h
+ON      (i.rowid=h.id)
+WHERE   1=1
+AND     (
+        1=0
+"""
+    items_q = ""
+    for n in search_nm:
+        items_q += "\tOR i.name LIKE '%" + n + "%'\n"
+    query += items_q
+    query += ")"
+    db = sqlite3.connect(G_DB_NAME)
+    db_setup(db)
+    cur = db.cursor()
+    ri = cur.execute(query)
+    for v in ri:
+        print(v)
+    db.close()
+
 def main():
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "ueh", ["update", "extract", "help", "values="])
+        opts, args = getopt.getopt(sys.argv[1:], "uesh", ["update", "extract", "search", "help", "values="])
     except getopt.GetoptError as err:
         print(err)
         sys.exit(-1)
-    do_update = True
+    exec_mode = 'u'
     for o, a in opts:
         if o in ("-u", "--update"):
-            do_update = True
+            exec_mode = 'u'
         elif o in ("-e", "--extract"):
-            do_update = False
+            exec_mode = 'e'
+        elif o in ("-s", "--search"):
+            exec_mode = 's'
         elif o in ("-h", "--help"):
             print(sys.argv[0], "Update and/or Extract Warframe Market historic price data")
             print('''
@@ -158,7 +184,7 @@ Usage: (options) item1, item2, ...
             ''')
             sys.exit(0)
     # args should contain the list of items to extract/update
-    if do_update:
+    if exec_mode == 'u':
         l_items = get_items_list(args)
         print("\tAdding/Updating:")
         for i in l_items:
@@ -167,8 +193,10 @@ Usage: (options) item1, item2, ...
         print("\tEntries added:")
         for i in rv:
             print(i, rv[i])
-    else:
-        print('abc')
+    elif exec_mode == 'e':
+        do_extract(args)
+    elif exec_mode == 's':
+        print('search')
 
 if __name__ == "__main__":
     main()
