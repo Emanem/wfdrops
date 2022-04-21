@@ -97,7 +97,11 @@ def get_hist_stats(item_name):
 def store_hist_data(item_names):
     print("\tFetching:")
     all_items = {}
+    n_digits = len(str(len(item_names)))
+    cnt = 0
     for nm in item_names:
+        cnt += 1
+        print("[{count:{fill}{align}{width}}/{total}]".format(count=cnt, total=len(item_names), fill=' ', align='>', width=n_digits), end='\t')
         print(nm, end='...')
         tm_start = time.monotonic()
         try:
@@ -263,7 +267,8 @@ Usage: (options) item1, item2, ...
         rv = store_hist_data(l_items)
         print("\tEntries added:")
         for i in rv:
-            print(i, rv[i])
+            if rv[i] > 0:
+                print(i, rv[i])
     elif exec_mode == 'e':
         ev = do_extract(args, extract_values)
         do_extract_printout(ev, extract_values)
