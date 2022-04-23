@@ -175,6 +175,34 @@ AND     (
     db.close()
     return rv
 
+def do_summary(n_days=10, min_volume=24, min_price=25):
+    query = """
+select x.name, x.a_min, x.a_max, x.a_vol
+from (
+	select 	i.name, avg(volume) as a_vol, avg(min) as a_min, avg(max) as a_max
+	FROM	items i
+	JOIN	hist h
+	ON		(i.ROWID=h.id)
+	WHERE	1=1
+	AND		h.ts > DATE('now', ?)
+	AND		NOT i.name LIKE '%set'
+	GROUP BY	i.name
+) x
+WHERE	1=1
+AND		x.a_vol >= ?
+AND		x.a_min >= ?
+ORDER BY	x.a_min DESC
+"""
+    interval_q = "-" + str(n_days) + " days"
+    db = sqlite3.connect(G_DB_NAME)
+    db_setup(db)
+    cur = db.cursor()
+    ri = cur.execute(query, (interval_q, min_volume, min_price))
+    print("name,avg min price,avg max price,avg volume")
+    for v in ri:
+        print(v[0], v[1], v[2], v[3], sep=',')
+    db.close()
+
 def do_extract_printout(ev, e_values):
     # find all the items we have managed to extract
     all_items = {}
@@ -210,7 +238,7 @@ def do_extract_printout(ev, e_values):
 
 def main():
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "uesh", ["update", "extract", "search", "help", "values="])
+        opts, args = getopt.getopt(sys.argv[1:], "ueshx", ["update", "extract", "summary", "search", "help", "values="])
     except getopt.GetoptError as err:
         print(err)
         sys.exit(-1)
@@ -248,6 +276,10 @@ Usage: (options) item1, item2, ...
                 Specifying any value using this option implies option '-e'
 
 -s, --search    Search remote warframe market for given items
+
+-x, --summary   Quickly print a summary of averaged volumes, min/max prices on the
+                last 10 days from today, ordered by min price descending (no other
+                input paramater needed, would be ignored)
             ''')
             sys.exit(0)
         elif o in ("--values"):
@@ -258,6 +290,8 @@ Usage: (options) item1, item2, ...
                     print("Invalid value '" + s + "' specified in extraction")
                     sys.exit(-1)
             extract_values = s_e_values
+        elif o in ("-x", "--summary"):
+            exec_mode = 'm'
     # args should contain the list of items to extract/update
     if exec_mode == 'u':
         l_items = get_items_list(args)
@@ -277,6 +311,8 @@ Usage: (options) item1, item2, ...
         print("\tSearch:")
         for i in l_items:
             print(i)
+    elif exec_mode == 'm':
+        do_summary()
 
 if __name__ == "__main__":
     main()
