@@ -238,12 +238,15 @@ def do_extract_printout(ev, e_values):
 
 def main():
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "ueshx", ["update", "extract", "summary", "search", "help", "values="])
+        opts, args = getopt.getopt(sys.argv[1:], "ueshx", ["update", "extract", "summary", "summary-days=", "summary-any", "search", "help", "values="])
     except getopt.GetoptError as err:
         print(err)
         sys.exit(-1)
     exec_mode = 'u'
     extract_values = ['volume', 'min', 'max', 'open', 'close', 'avg', 'w_avg', 'median', 'm_avg']
+    s_n_days = 10
+    s_min_volume = 24
+    s_min_price = 25
     for o, a in opts:
         if o in ("-u", "--update"):
             exec_mode = 'u'
@@ -280,6 +283,17 @@ Usage: (options) item1, item2, ...
 -x, --summary   Quickly print a summary of averaged volumes, min/max prices on the
                 last 10 days from today, ordered by min price descending (no other
                 input paramater needed, would be ignored)
+                By default only items whose average volume >= 24 and average
+                min price >= 25 will be reported
+
+--summary-days  Specifies how many days of interval have to be chosen when
+                printing out the summary (default 10)
+                Specifying any value using this option implies option '-x'
+
+--summary-any   Specifies a flag to report all the items from -x/--summary, thus
+                removing the constraints regarding min daily volume and average min
+                price (24 and 25 respectively)
+                Specifying any value using this option implies option '-x'
             ''')
             sys.exit(0)
         elif o in ("--values"):
@@ -292,6 +306,16 @@ Usage: (options) item1, item2, ...
             extract_values = s_e_values
         elif o in ("-x", "--summary"):
             exec_mode = 'm'
+        elif o in ("--summary-days"):
+            exec_mode = 'm'
+            s_n_days = int(a)
+            if s_n_days <= 0:
+                print("Invalid number of days '" + a + "' specified, must be > 0")
+                sys.exit(-1)
+        elif o in ("--summary-any"):
+            exec_mode = 'm'
+            s_min_volume = 0
+            s_min_price = 0
     # args should contain the list of items to extract/update
     if exec_mode == 'u':
         l_items = get_items_list(args)
@@ -312,7 +336,7 @@ Usage: (options) item1, item2, ...
         for i in l_items:
             print(i)
     elif exec_mode == 'm':
-        do_summary()
+        do_summary(n_days=s_n_days, min_volume=s_min_volume, min_price=s_min_price)
 
 if __name__ == "__main__":
     main()
