@@ -11,6 +11,9 @@ import getopt
 import sys
 import re
 import time
+from tkinter import *
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 
 G_DB_NAME = "wf_mkt_hist.db"
 G_DB_ITEMS_NAME = "items"
@@ -236,9 +239,112 @@ def do_extract_printout(ev, e_values):
                     print(",", val, sep='', end='')
         print()
 
+class MainWin(Frame):
+    def __init__(self, master=None):
+        super().__init__(master)
+        self.master = master
+        self.master.title("WF Market Hist")
+        self.master.myId = 1
+        self.master.bind("<Configure>", self.on_resize)
+        self.my_w = 0
+        self.my_h = 0
+        self.my_graph_w = None
+        self.my_item_data = ""
+        self.my_x_data = []
+        self.my_y1_data = []
+        self.my_y2_data = []
+        self.create_widgets()
+
+    def reset_data(self):
+        self.my_x_data = []
+        self.my_y1_data = []
+        self.my_y2_data = []
+
+    def search_changed(self, *args):
+        v = self.search_val.get()
+        if len(v) <= 0:
+            return None
+        print("value", v)
+        ev = do_extract([v], ['volume', 'min'])
+        # get the first item in alphabetical order
+        all_items = {}
+        for k, v in ev.items():
+            for i in v.keys():
+                all_items[i] = 0
+        sorted_items = list(all_items.keys())
+        sorted_items.sort()
+        if not sorted_items:
+            return None
+        si = sorted_items[0]
+        self.my_item_data = si
+        # extract the time keys only where we have
+        # our item
+        time_keys = []
+        for k, v in ev.items():
+            if si in v:
+                time_keys.append(k)
+        time_keys.sort()
+        self.reset_data()
+        for k in time_keys:
+            v = ev[k]
+            self.my_x_data.append(k)
+            self.my_y1_data.append(v[si]['min'])
+            self.my_y2_data.append(v[si]['volume'])
+        self.update_graph()
+
+    def update_graph(self, w=0, h=0):
+        if self.my_graph_w is not None:
+            self.my_graph_w.destroy()
+        if (w == 0) or (h == 0):
+            w = self.master.winfo_width()
+            h = self.master.winfo_height()
+        dpi = 100
+        graph = Figure(figsize=((w-20)/dpi, (h-self.graph_start_y-10)/dpi), dpi=100)
+        sp = graph.add_subplot(111)
+        sp.set_xlabel('Date')
+        sp.set_ylabel('Price (min)', color="red")
+        sp.set_title(self.my_item_data)
+        sp.plot(self.my_x_data, self.my_y1_data, color="red")
+        sp2 = sp.twinx()
+        sp2.plot(self.my_x_data, self.my_y2_data, color="blue")
+        sp2.set_ylabel('Volume', color="blue")
+        self.canvas = FigureCanvasTkAgg(graph, master=self.master)
+        self.canvas.draw()
+        self.canvas.get_tk_widget().place(x=10, y=self.graph_start_y)
+        self.my_graph_w = self.canvas.get_tk_widget()
+
+    def on_resize(self, event):
+        if hasattr(event.widget, 'myId') and (event.widget.myId == 1):
+            if (event.width != self.my_w) or (event.height != self.my_h):
+                self.update_graph()
+            self.my_w = event.width
+            self.my_h = event.height
+
+    def create_widgets(self):
+        y_plc = 10
+        self.label_top = Label(self.master, text="Search for item:", anchor=W)
+        self.label_top.place(x=10, y=y_plc, width=128, height=24)
+        self.search_val = StringVar()
+        self.search_val.trace_add("write", self.search_changed)
+        self.search_entry = Entry(self.master, textvariable=self.search_val)
+        self.search_entry.place(x=138, y=y_plc, width=128, height=24)
+        self.quit = Button(self.master, text="Exit", command=self.master.destroy)
+        self.quit.place(x=138*2, y=y_plc, height=24)
+        y_plc += 24+10
+        self.graph_start_y = y_plc
+        self.update_graph(640, 480)
+
+def display_graphs():
+    root = Tk()
+    root.minsize(640, 480)
+    root.geometry("640x480")
+    app = MainWin(master=root)
+    app.mainloop()
+    return None
+
 def main():
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "ueshx", ["update", "extract", "summary", "summary-days=", "summary-any", "search", "help", "values="])
+        opts, args = getopt.getopt(sys.argv[1:], "gueshx", ["graphs", "update", "extract", "summary", "summary-days=", "summary-any", "search", "help", "values="])
     except getopt.GetoptError as err:
         print(err)
         sys.exit(-1)
@@ -248,7 +354,9 @@ def main():
     s_min_volume = 24
     s_min_price = 25
     for o, a in opts:
-        if o in ("-u", "--update"):
+        if o in ("-g", "--graphs"):
+            exec_mode = 'g'
+        elif o in ("-u", "--update"):
             exec_mode = 'u'
         elif o in ("-e", "--extract"):
             exec_mode = 'e'
@@ -258,6 +366,9 @@ def main():
             print(sys.argv[0], "Update and/or Extract Warframe Market historic price data")
             print('''
 Usage: (options) item1, item2, ...
+
+-g, --graphs    Display a Tkinter UI with a search pane and graphs of
+                a given item, min/avg/max and the volume
 
 -u, --update    Add/update the given items to the local SQLite database
                 This is the default operation mode
@@ -317,7 +428,9 @@ Usage: (options) item1, item2, ...
             s_min_volume = 0
             s_min_price = 0
     # args should contain the list of items to extract/update
-    if exec_mode == 'u':
+    if exec_mode == 'g':
+        display_graphs()
+    elif exec_mode == 'u':
         l_items = get_items_list(args)
         print("\tAdding/Updating:")
         for i in l_items:
