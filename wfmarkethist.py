@@ -255,21 +255,19 @@ class MainWin(Frame):
         self.graph = None
         self.canvas = None
         self.my_item_data = ""
-        self.my_x_data = []
-        self.my_y1_data = []
-        self.my_y2_data = []
+        self.reset_data()
         self.create_widgets()
 
     def reset_data(self):
         self.my_x_data = []
-        self.my_y1_data = []
+        self.my_y1_data = {'min':[], 'avg':[], 'max':[]}
         self.my_y2_data = []
 
     def search_changed(self, *args):
         v = self.search_val.get()
         if len(v) <= 0:
             return None
-        ev = do_extract([v], ['volume', 'min'], True)
+        ev = do_extract([v], ['volume', 'min', 'avg', 'max'], True)
         # get the first item in alphabetical order
         all_items = {}
         for k, v in ev.items():
@@ -292,7 +290,9 @@ class MainWin(Frame):
         for k in time_keys:
             v = ev[k]
             self.my_x_data.append(k)
-            self.my_y1_data.append(v[si]['min'])
+            self.my_y1_data['min'].append(v[si]['min'])
+            self.my_y1_data['avg'].append(v[si]['avg'])
+            self.my_y1_data['max'].append(v[si]['max'])
             self.my_y2_data.append(v[si]['volume'])
         self.update_graph()
 
@@ -309,19 +309,20 @@ class MainWin(Frame):
             self.graph.clear()
             self.graph.set_figwidth(g_w/dpi)
             self.graph.set_figheight(g_h/dpi)
-        sp = self.graph.add_subplot(111)
-        sp.set_ylabel('Price (min)', color="red")
-        sp.set_title(self.my_item_data)
-        sp.plot(self.my_x_data, self.my_y1_data, color="red")
-        sp.xaxis.set_major_formatter(mdates.DateFormatter('%y-%m-%d'))
-        sp.xaxis.set_major_locator(mdates.DayLocator(interval=15))
-        sp.tick_params(axis='x', labelrotation=25)
-        sp2 = sp.twinx()
-        sp2.bar(self.my_x_data, self.my_y2_data, color=[0, 0, 1, 0.3])
-        sp2.set_ylabel('Volume', color="blue")
-        sp2.xaxis.set_major_formatter(mdates.DateFormatter('%y-%m-%d'))
-        sp2.xaxis.set_major_locator(mdates.DayLocator(interval=15))
-        sp2.tick_params(axis='x', labelrotation=25)
+        if self.my_x_data:
+            sp = self.graph.add_subplot(111)
+            sp.set_ylabel('Price', color="red")
+            sp.set_title(self.my_item_data)
+            sp.plot(self.my_x_data, self.my_y1_data['min'], color=[1, 0, 0])
+            sp.plot(self.my_x_data, self.my_y1_data['avg'], color=[1, 0.5, 0.5])
+            sp.plot(self.my_x_data, self.my_y1_data['max'], color=[1, 0.75, 0.75])
+            sp2 = sp.twinx()
+            sp2.bar(self.my_x_data, self.my_y2_data, color=[0, 0, 1, 0.3])
+            sp2.set_ylabel('Volume', color="blue")
+            sp.set_xlim(min(self.my_x_data), max(self.my_x_data))
+            for l in sp.get_xticklabels():
+                l.set_rotation(25)
+                l.set_horizontalalignment('right')
         if self.canvas is None:
             self.canvas = FigureCanvasTkAgg(self.graph, master=self.master)
         self.canvas.draw()
