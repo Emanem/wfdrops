@@ -13,6 +13,7 @@ import re
 import time
 from tkinter import *
 from matplotlib.figure import Figure
+import matplotlib.dates as mdates
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 
 G_DB_NAME = "wf_mkt_hist.db"
@@ -140,7 +141,7 @@ def get_items_list(search_nm):
                 rv[k['item_name']] = 0
     return list(rv.keys())
 
-def do_extract(search_nm, e_values):
+def do_extract(search_nm, e_values, wildcard_ws=False):
     query = """
 SELECT  i.name as name, h.ts as ts
 """
@@ -158,6 +159,9 @@ AND     (
 """
     items_q = ""
     for n in search_nm:
+        if wildcard_ws:
+            n_v = re.split(r'\s+', n)
+            n = '%'.join(n_v)
         items_q += "\tOR i.name LIKE '%" + n + "%'\n"
     query += items_q
     query += ")"
@@ -266,7 +270,7 @@ class MainWin(Frame):
         if len(v) <= 0:
             return None
         print("value", v)
-        ev = do_extract([v], ['volume', 'min'])
+        ev = do_extract([v], ['volume', 'min'], True)
         # get the first item in alphabetical order
         all_items = {}
         for k, v in ev.items():
@@ -307,13 +311,18 @@ class MainWin(Frame):
             self.graph.set_figwidth(g_w/dpi)
             self.graph.set_figheight(g_h/dpi)
         sp = self.graph.add_subplot(111)
-        sp.set_xlabel('Date')
         sp.set_ylabel('Price (min)', color="red")
         sp.set_title(self.my_item_data)
         sp.plot(self.my_x_data, self.my_y1_data, color="red")
+        sp.xaxis.set_major_formatter(mdates.DateFormatter('%y-%m-%d'))
+        sp.xaxis.set_major_locator(mdates.DayLocator(interval=15))
+        sp.tick_params(axis='x', labelrotation=25)
         sp2 = sp.twinx()
         sp2.plot(self.my_x_data, self.my_y2_data, color="blue")
         sp2.set_ylabel('Volume', color="blue")
+        sp2.xaxis.set_major_formatter(mdates.DateFormatter('%y-%m-%d'))
+        sp2.xaxis.set_major_locator(mdates.DayLocator(interval=15))
+        sp2.tick_params(axis='x', labelrotation=25)
         if self.canvas is None:
             self.canvas = FigureCanvasTkAgg(self.graph, master=self.master)
         self.canvas.draw()
