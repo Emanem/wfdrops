@@ -248,7 +248,8 @@ class MainWin(Frame):
         self.master.bind("<Configure>", self.on_resize)
         self.my_w = 0
         self.my_h = 0
-        self.my_graph_w = None
+        self.graph = None
+        self.canvas = None
         self.my_item_data = ""
         self.my_x_data = []
         self.my_y1_data = []
@@ -293,14 +294,19 @@ class MainWin(Frame):
         self.update_graph()
 
     def update_graph(self, w=0, h=0):
-        if self.my_graph_w is not None:
-            self.my_graph_w.destroy()
         if (w == 0) or (h == 0):
             w = self.master.winfo_width()
             h = self.master.winfo_height()
         dpi = 100
-        graph = Figure(figsize=((w-20)/dpi, (h-self.graph_start_y-10)/dpi), dpi=100)
-        sp = graph.add_subplot(111)
+        g_w = (w-20)
+        g_h = (h-self.graph_start_y-10)
+        if not self.graph:
+            self.graph = Figure(figsize=(g_w/dpi, g_h/dpi), dpi=100)
+        else:
+            self.graph.clear()
+            self.graph.set_figwidth(g_w/dpi)
+            self.graph.set_figheight(g_h/dpi)
+        sp = self.graph.add_subplot(111)
         sp.set_xlabel('Date')
         sp.set_ylabel('Price (min)', color="red")
         sp.set_title(self.my_item_data)
@@ -308,10 +314,11 @@ class MainWin(Frame):
         sp2 = sp.twinx()
         sp2.plot(self.my_x_data, self.my_y2_data, color="blue")
         sp2.set_ylabel('Volume', color="blue")
-        self.canvas = FigureCanvasTkAgg(graph, master=self.master)
+        if self.canvas is None:
+            self.canvas = FigureCanvasTkAgg(self.graph, master=self.master)
         self.canvas.draw()
+        self.canvas.get_tk_widget().config(width=g_w, height=g_h)
         self.canvas.get_tk_widget().place(x=10, y=self.graph_start_y)
-        self.my_graph_w = self.canvas.get_tk_widget()
 
     def on_resize(self, event):
         if hasattr(event.widget, 'myId') and (event.widget.myId == 1):
