@@ -269,7 +269,6 @@ class MainWin(Frame):
         v = self.search_val.get()
         if len(v) <= 0:
             return None
-        print("value", v)
         ev = do_extract([v], ['volume', 'min'], True)
         # get the first item in alphabetical order
         all_items = {}
@@ -318,7 +317,7 @@ class MainWin(Frame):
         sp.xaxis.set_major_locator(mdates.DayLocator(interval=15))
         sp.tick_params(axis='x', labelrotation=25)
         sp2 = sp.twinx()
-        sp2.plot(self.my_x_data, self.my_y2_data, color="blue")
+        sp2.bar(self.my_x_data, self.my_y2_data, color=[0, 0, 1, 0.3])
         sp2.set_ylabel('Volume', color="blue")
         sp2.xaxis.set_major_formatter(mdates.DateFormatter('%y-%m-%d'))
         sp2.xaxis.set_major_locator(mdates.DayLocator(interval=15))
