@@ -255,6 +255,7 @@ class MainWin(Frame):
         self.master.title("WF Market Hist")
         self.master.myId = 1
         self.master.bind("<Configure>", self.on_resize)
+        self.master.bind_all('<KeyPress>', self.on_key_press)
         self.my_w = 0
         self.my_h = 0
         self.graph = None
@@ -271,6 +272,7 @@ class MainWin(Frame):
     def search_changed(self, *args):
         v = self.search_val.get()
         if len(v) <= 0:
+            self.other_items_val.set("")
             return None
         ev = do_extract([v], ['volume', 'min', 'avg', 'max'], True)
         # get the first item in alphabetical order
@@ -281,9 +283,11 @@ class MainWin(Frame):
         sorted_items = list(all_items.keys())
         sorted_items.sort()
         if not sorted_items:
+            self.other_items_val.set("<no suggestions available>")
             return None
         si = sorted_items[0]
         self.my_item_data = si
+        self.other_items_val.set(', '.join(sorted_items))
         # extract the time keys only where we have
         # our item
         time_keys = []
@@ -350,6 +354,10 @@ class MainWin(Frame):
             self.my_w = event.width
             self.my_h = event.height
 
+    def on_key_press(self, event):
+        if event.keysym == 'Escape':
+            self.master.destroy()
+
     def create_widgets(self):
         y_plc = 10
         # Label - "Search for item:"
@@ -362,7 +370,8 @@ class MainWin(Frame):
         self.search_entry.place(x=138, y=y_plc, width=128, height=24)
         # Label to display the other choices
         # don't care about width, we sort it out in 'on_resize'
-        self.other_items = Label(self.master, text="", anchor=W)
+        self.other_items_val = StringVar()
+        self.other_items = Label(self.master, textvariable=self.other_items_val, anchor=W)
         self.other_items.place(x=138+128+10, y=y_plc, height=24)
         # Button - "Quit" don't care about x location
         # we sort it out automatically in 'on_resize'
@@ -450,6 +459,8 @@ Usage: (options) item1, item2, ...
                 removing the constraints regarding min daily volume and average min
                 price (24 and 25 respectively)
                 Specifying any value using this option implies option '-x'
+
+-h, --help      Displays this help and exit
             ''')
             sys.exit(0)
         elif o in ("--values"):
