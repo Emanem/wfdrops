@@ -127,10 +127,15 @@ def store_hist_data(item_names):
     db.close()
     return rv
 
-def get_items_list(search_nm):
+def get_items_list(search_nm, get_all=False):
     str_url = 'https://api.warframe.market/v1/items'
     data = get_wfm_webapi(str_url)
     jdata = json.loads(data)
+    if get_all:
+        rv = {}
+        for k in jdata['payload']['items']:
+            rv[k['item_name']] = 0
+        return rv
     r_items = []
     for s in search_nm:
         r_items.append(re.compile(r'.*' + re.escape(s.strip()) + r'.*', re.IGNORECASE))
@@ -360,7 +365,7 @@ def display_graphs():
 
 def main():
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "gueshx", ["graphs", "update", "extract", "summary", "summary-days=", "summary-any", "search", "help", "values="])
+        opts, args = getopt.getopt(sys.argv[1:], "gueshx", ["update-all", "graphs", "update", "extract", "summary", "summary-days=", "summary-any", "search", "help", "values="])
     except getopt.GetoptError as err:
         print(err)
         sys.exit(-1)
@@ -369,11 +374,15 @@ def main():
     s_n_days = 10
     s_min_volume = 24
     s_min_price = 25
+    update_all = False
     for o, a in opts:
         if o in ("-g", "--graphs"):
             exec_mode = 'g'
         elif o in ("-u", "--update"):
             exec_mode = 'u'
+        elif o in ("--update-all"):
+            exec_mode = 'u'
+            update_all = True
         elif o in ("-e", "--extract"):
             exec_mode = 'e'
         elif o in ("-s", "--search"):
@@ -388,6 +397,9 @@ Usage: (options) item1, item2, ...
 
 -u, --update    Add/update the given items to the local SQLite database
                 This is the default operation mode
+
+--update-all    Add/updates all the possible items to the local SQLite
+                database - run this sparingly
 
 -e, --extract   Extract historic price data for the given items from the
                 local SQLite database
@@ -447,7 +459,7 @@ Usage: (options) item1, item2, ...
     if exec_mode == 'g':
         display_graphs()
     elif exec_mode == 'u':
-        l_items = get_items_list(args)
+        l_items = get_items_list(args, get_all=update_all)
         print("\tAdding/Updating:")
         for i in l_items:
             print(i)
