@@ -335,22 +335,39 @@ class MainWin(Frame):
         self.canvas.get_tk_widget().place(x=10, y=self.graph_start_y)
 
     def on_resize(self, event):
-        if hasattr(event.widget, 'myId') and (event.widget.myId == 1):
-            if (event.width != self.my_w) or (event.height != self.my_h):
+        is_main_window = hasattr(event.widget, 'myId') and (event.widget.myId == 1)
+        main_changed_size = is_main_window and ((event.width != self.my_w) or (event.height != self.my_h))
+        if is_main_window:
+            if main_changed_size:
+                # update the width of other choices label
+                oc_w = event.width - self.other_items.winfo_x() - self.quit.winfo_width() - 20
+                self.other_items.place(width=oc_w)
+                # update quit button place
+                q_pos_x = self.master.winfo_width() - 10 - self.quit.winfo_width()
+                self.quit.place(x=q_pos_x)
+                # update graph
                 self.update_graph()
             self.my_w = event.width
             self.my_h = event.height
 
     def create_widgets(self):
         y_plc = 10
+        # Label - "Search for item:"
         self.label_top = Label(self.master, text="Search for item:", anchor=W)
         self.label_top.place(x=10, y=y_plc, width=128, height=24)
+        # Entry to execute the search
         self.search_val = StringVar()
         self.search_val.trace_add("write", self.search_changed)
         self.search_entry = Entry(self.master, textvariable=self.search_val)
         self.search_entry.place(x=138, y=y_plc, width=128, height=24)
-        self.quit = Button(self.master, text="Exit", command=self.master.destroy)
-        self.quit.place(x=138*2, y=y_plc, height=24)
+        # Label to display the other choices
+        # don't care about width, we sort it out in 'on_resize'
+        self.other_items = Label(self.master, text="", anchor=W)
+        self.other_items.place(x=138+128+10, y=y_plc, height=24)
+        # Button - "Quit" don't care about x location
+        # we sort it out automatically in 'on_resize'
+        self.quit = Button(self.master, text="Quit", command=self.master.destroy)
+        self.quit.place(x=0, y=y_plc, height=24)
         y_plc += 24+10
         self.graph_start_y = y_plc
         self.update_graph(640, 480)
