@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 
 import datetime
-import ssl
-import urllib.parse as parse
-import urllib.request
+import urllib3
 from lxml import html
 import json
 import sqlite3
@@ -84,18 +82,13 @@ def parse_hist_stats(data):
             rv.append((datetime.datetime.fromisoformat(x['datetime']), int(x['volume']), int(x['min_price']), int(x['max_price']), int(x['open_price']), int(x['closed_price']), float(x['avg_price']), float(x['wa_price']), float(x['median']), float(x.get('moving_avg', 0.0))))
     return rv
 
-def get_wfm_webapi(str_url):
-    # ignore certificate - I know it's not great
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-    req = urllib.request.Request(str_url, data=None, headers={'User-Agent': G_WFM_USER_AGENT})
-    f = urllib.request.urlopen(req, context=ctx)
-    return f.read().decode('utf-8')
+def get_wfm_webapi(str_url, https_cp):
+    f = https_cp.urlopen('GET', str_url, headers={'User-Agent': G_WFM_USER_AGENT})
+    return f.data.decode('utf-8')
 
-def get_hist_stats(item_name):
-    str_url = 'https://warframe.market/items/' + item_name.replace('&', 'and').replace('-', '_').replace(' ', '_').lower() + '/statistics'
-    data = get_wfm_webapi(str_url)
+def get_hist_stats(item_name, https_cp):
+    str_url = '/items/' + item_name.replace('&', 'and').replace('-', '_').replace(' ', '_').lower() + '/statistics'
+    data = get_wfm_webapi(str_url, https_cp)
     return parse_hist_stats(data)
 
 def store_hist_data(item_names):
@@ -103,13 +96,15 @@ def store_hist_data(item_names):
     all_items = {}
     n_digits = len(str(len(item_names)))
     cnt = 0
+    # create the HTTPS pool here
+    https_cp = urllib3.HTTPSConnectionPool('warframe.market')
     for nm in item_names:
         cnt += 1
         print("[{count:{fill}{align}{width}}/{total}]".format(count=cnt, total=len(item_names), fill=' ', align='>', width=n_digits), end='\t')
         print(nm, end='...')
         tm_start = time.monotonic()
         try:
-            all_items[nm] = get_hist_stats(nm)
+            all_items[nm] = get_hist_stats(nm, https_cp)
         except Exception as e:
             print("Error, carrying on (", e, ")")
         else:
@@ -128,8 +123,9 @@ def store_hist_data(item_names):
     return rv
 
 def get_items_list(search_nm, get_all=False):
-    str_url = 'https://api.warframe.market/v1/items'
-    data = get_wfm_webapi(str_url)
+    str_url = '/v1/items'
+    https_cp = urllib3.HTTPSConnectionPool('api.warframe.market')
+    data = get_wfm_webapi(str_url, https_cp)
     jdata = json.loads(data)
     if get_all:
         rv = {}
