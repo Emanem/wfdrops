@@ -31,8 +31,8 @@ def db_setup(db):
 def db_fetch_names(db, nm):
     cur = db.cursor()
     for i in nm:
-        q = "INSERT INTO " + G_DB_ITEMS_NAME + "(name) SELECT '" + i + "' WHERE NOT EXISTS (SELECT 1 FROM " + G_DB_ITEMS_NAME + " WHERE name='" + i + "')";
-        cur.execute(q)
+        q = "INSERT INTO " + G_DB_ITEMS_NAME + "(name) SELECT ? WHERE NOT EXISTS (SELECT 1 FROM " + G_DB_ITEMS_NAME + " WHERE name=?)";
+        cur.execute(q, (i, i))
     db.commit()
     rv = {}
     ri = cur.execute("SELECT MAX(rowid) as id, name FROM " + G_DB_ITEMS_NAME + " WHERE 1=1 GROUP BY name")
@@ -87,7 +87,7 @@ def get_wfm_webapi(str_url, https_cp):
     return f.data.decode('utf-8')
 
 def get_hist_stats(item_name, https_cp):
-    str_url = '/items/' + item_name.replace('&', 'and').replace('-', '_').replace(' ', '_').lower() + '/statistics'
+    str_url = '/items/' + item_name.replace('&', 'and').replace('-', '_').replace(' ', '_').replace('\'', '').lower() + '/statistics'
     data = get_wfm_webapi(str_url, https_cp)
     return parse_hist_stats(data)
 
@@ -496,6 +496,14 @@ Usage: (options) item1, item2, ...
         for i in rv:
             if rv[i] > 0:
                 print(i, rv[i])
+        print("\tSummary count added:")
+        dist = {}
+        for k, v in rv.items():
+            if v not in dist:
+                dist[v] = 0
+            dist[v] = dist[v] + 1
+        for i in dist:
+            print(dist[i], "->", i)
     elif exec_mode == 'e':
         ev = do_extract(args, extract_values)
         do_extract_printout(ev, extract_values)
