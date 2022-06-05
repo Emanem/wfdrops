@@ -273,6 +273,8 @@ class MainWin(Frame):
         v = self.search_val.get()
         if len(v) <= 0:
             self.other_items_val.set("")
+            self.reset_data()
+            self.update_graph()
             return None
         ev = do_extract([v], ['volume', 'min', 'avg', 'max'], True)
         # get the first item in alphabetical order
@@ -284,6 +286,8 @@ class MainWin(Frame):
         sorted_items.sort()
         if not sorted_items:
             self.other_items_val.set("<no suggestions available>")
+            self.reset_data()
+            self.update_graph()
             return None
         si = sorted_items[0]
         self.my_item_data = si
