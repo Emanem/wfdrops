@@ -18,7 +18,7 @@ G_DB_NAME = "wf_mkt_hist.db"
 G_DB_ITEMS_NAME = "items"
 G_DB_ITEMS_HIST = "hist"
 G_WFM_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36'
-G_SLEEP_THROTTLE = 0.1
+G_SLEEP_THROTTLE = 0.5
 
 def db_setup(db):
     cur = db.cursor()
@@ -87,7 +87,7 @@ def get_wfm_webapi(str_url, https_cp):
     return f.data.decode('utf-8')
 
 def get_hist_stats(item_name, https_cp):
-    str_url = '/items/' + item_name.replace('&', 'and').replace('-', '_').replace(' ', '_').replace('\'', '').lower() + '/statistics'
+    str_url = '/items/' + item_name.replace('&', 'and').replace('-', '_').replace(' ', '_').replace('\'', '').replace('(', '').replace(')', '').lower() + '/statistics'
     data = get_wfm_webapi(str_url, https_cp)
     return parse_hist_stats(data)
 
@@ -110,7 +110,7 @@ def store_hist_data(item_names):
         else:
             # this is not great - but it does work...
             tm_end = time.monotonic()
-            print('done', tm_end-tm_start, 's')
+            print('done', tm_end-tm_start, 's', "(" + str(len(all_items[nm])) + " entries)")
         finally:
             tm_end = time.monotonic()
             sleep_throttle = G_SLEEP_THROTTLE - (tm_end - tm_start)
@@ -139,6 +139,7 @@ def get_items_list(search_nm, get_all=False):
     for k in jdata['payload']['items']:
         for r_i in r_items:
             if r_i.match(k['item_name']) is not None:
+                #print("k", k)
                 rv[k['item_name']] = 0
     return list(rv.keys())
 
