@@ -87,24 +87,24 @@ def get_wfm_webapi(str_url, https_cp):
     return f.data.decode('utf-8')
 
 def get_hist_stats(item_name, https_cp):
-    str_url = '/items/' + item_name.replace('&', 'and').replace('-', '_').replace(' ', '_').replace('\'', '').replace('(', '').replace(')', '').lower() + '/statistics'
+    str_url = '/items/' + item_name + '/statistics'
     data = get_wfm_webapi(str_url, https_cp)
     return parse_hist_stats(data)
 
 def store_hist_data(item_names):
     print("\tFetching:")
     all_items = {}
-    n_digits = len(str(len(item_names)))
+    n_digits = len(str(len(item_names.keys())))
     cnt = 0
     # create the HTTPS pool here
     https_cp = urllib3.HTTPSConnectionPool('warframe.market')
-    for nm in item_names:
+    for nm, q_nm in item_names.items():
         cnt += 1
         print("[{count:{fill}{align}{width}}/{total}]".format(count=cnt, total=len(item_names), fill=' ', align='>', width=n_digits), end='\t')
         print(nm, end='...')
         tm_start = time.monotonic()
         try:
-            all_items[nm] = get_hist_stats(nm, https_cp)
+            all_items[nm] = get_hist_stats(q_nm, https_cp)
         except Exception as e:
             print("Error, carrying on (", e, ")")
         else:
@@ -130,7 +130,7 @@ def get_items_list(search_nm, get_all=False):
     if get_all:
         rv = {}
         for k in jdata['payload']['items']:
-            rv[k['item_name']] = 0
+            rv[k['item_name']] = k['url_name']
         return rv
     r_items = []
     for s in search_nm:
@@ -139,9 +139,8 @@ def get_items_list(search_nm, get_all=False):
     for k in jdata['payload']['items']:
         for r_i in r_items:
             if r_i.match(k['item_name']) is not None:
-                #print("k", k)
-                rv[k['item_name']] = 0
-    return list(rv.keys())
+                rv[k['item_name']] = k['url_name']
+    return rv
 
 def do_extract(search_nm, e_values, wildcard_ws=False):
     query = """
@@ -488,11 +487,11 @@ Usage: (options) item1, item2, ...
     if exec_mode == 'g':
         display_graphs()
     elif exec_mode == 'u':
-        l_items = get_items_list(args, get_all=update_all)
+        items = get_items_list(args, get_all=update_all)
         print("\tAdding/Updating:")
-        for i in l_items:
+        for i in items.keys():
             print(i)
-        rv = store_hist_data(l_items)
+        rv = store_hist_data(items)
         print("\tEntries added:")
         for i in rv:
             if rv[i] > 0:
@@ -511,7 +510,7 @@ Usage: (options) item1, item2, ...
     elif exec_mode == 's':
         l_items = get_items_list(args)
         print("\tSearch:")
-        for i in l_items:
+        for i in l_items.keys():
             print(i)
     elif exec_mode == 'm':
         do_summary(n_days=s_n_days, min_volume=s_min_volume, min_price=s_min_price)
