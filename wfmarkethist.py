@@ -10,6 +10,7 @@ import sys
 import re
 import time
 from tkinter import *
+from tkinter.ttk import Notebook
 from matplotlib.figure import Figure
 import matplotlib.dates as mdates
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
@@ -258,14 +259,9 @@ def do_extract_printout(ev, e_values):
                     print(",", val, sep='', end='')
         print()
 
-class MainWin(Frame):
+class HistWin(Frame):
     def __init__(self, master=None):
         super().__init__(master)
-        self.master = master
-        self.master.title("WF Market Hist")
-        self.master.myId = 1
-        self.master.bind("<Configure>", self.on_resize)
-        self.master.bind_all('<KeyPress>', self.on_key_press)
         self.my_w = 0
         self.my_h = 0
         self.graph = None
@@ -273,6 +269,7 @@ class MainWin(Frame):
         self.my_item_data = ""
         self.reset_data()
         self.create_widgets()
+        #self.update_graph(100, 100)
 
     def reset_data(self):
         self.my_x_data = []
@@ -301,7 +298,7 @@ class MainWin(Frame):
             return None
         si = sorted_items[0]
         self.my_item_data = si
-        self.other_items_val.set(', '.join(sorted_items)[:256])
+        self.other_items_val.set(', '.join(sorted_items)[:2048])
         # extract the time keys only where we have
         # our item
         time_keys = []
@@ -352,28 +349,14 @@ class MainWin(Frame):
         self.canvas.get_tk_widget().config(width=g_w, height=g_h)
         self.canvas.get_tk_widget().place(x=10, y=self.graph_start_y)
 
-    def on_resize(self, event):
-        is_main_window = hasattr(event.widget, 'myId') and (event.widget.myId == 1)
-        main_changed_size = is_main_window and ((event.width != self.my_w) or (event.height != self.my_h))
-        if is_main_window:
-            if main_changed_size:
-                # update the width of other choices label
-                oc_w = event.width - self.other_items.winfo_x() - self.quit.winfo_width() - 20
-                self.other_items.place(width=oc_w)
-                # update quit button place
-                q_pos_x = self.master.winfo_width() - 10 - self.quit.winfo_width()
-                self.quit.place(x=q_pos_x)
-                # update graph
-                self.update_graph()
-            self.my_w = event.width
-            self.my_h = event.height
-
-    def on_key_press(self, event):
-        if event.keysym == 'Escape':
-            self.master.destroy()
+    def do_resize(self, w, h):
+        oc_w = w - self.other_items.winfo_x() - 20
+        self.other_items.place(width=oc_w)
+        self.update_graph(w, h)
+        self.config(width=w, height=h)
 
     def create_widgets(self):
-        y_plc = 10
+        y_plc = 30
         # Label - "Search for item:"
         self.label_top = Label(self.master, text="Search for item:", anchor=W)
         self.label_top.place(x=10, y=y_plc, width=128, height=24)
@@ -387,13 +370,8 @@ class MainWin(Frame):
         self.other_items_val = StringVar()
         self.other_items = Label(self.master, textvariable=self.other_items_val, anchor=W)
         self.other_items.place(x=138+128+10, y=y_plc, height=24)
-        # Button - "Quit" don't care about x location
-        # we sort it out automatically in 'on_resize'
-        self.quit = Button(self.master, text="Quit", command=self.master.destroy)
-        self.quit.place(x=0, y=y_plc, height=24)
         y_plc += 24+10
         self.graph_start_y = y_plc
-        self.update_graph(640, 480)
 
 # values has to be a list of dictionaries of the form {'id':<string>, 'value':<float>}
 def treemap_plot(values, tl = {'x':0.0, 'y':0.0}, br = {'x':1.0, 'y':1.0}, split_x=True):
@@ -448,15 +426,11 @@ def treemap_draw(tm, ax):
 class TreeMapWin(Frame):
     def __init__(self, master=None):
         super().__init__(master)
-        self.master = master
-        self.master.myId = 1
-        self.master.bind("<Configure>", self.on_resize)
-        self.my_w = 0
-        self.my_h = 0
         self.graph = None
         self.canvas = None
         self.reset_data()
         self.create_widgets()
+        self.update_graph(100, 100)
 
     def reset_data(self):
         # this should be in the form of [{'id':'val1', 'value':1.0}, {'id':'val2', 'value':0.5}, {'id':'val3', 'value':0.4}]
@@ -478,7 +452,7 @@ class TreeMapWin(Frame):
             self.reset_data()
             self.update_graph()
             return None
-        self.other_items_val.set(', '.join([x[0] for x in ev])[:256])
+        self.other_items_val.set(', '.join([x[0] for x in ev])[:2048])
         self.reset_data()
         for e in ev:
             self.my_tm_data.append({'id':e[0], 'value':e[1]})
@@ -506,21 +480,15 @@ class TreeMapWin(Frame):
         self.canvas.get_tk_widget().config(width=g_w, height=g_h)
         self.canvas.get_tk_widget().place(x=10, y=self.graph_start_y)
 
-    def on_resize(self, event):
-        is_main_window = hasattr(event.widget, 'myId') and (event.widget.myId == 1)
-        main_changed_size = is_main_window and ((event.width != self.my_w) or (event.height != self.my_h))
-        if is_main_window:
-            if main_changed_size:
-                # update the width of other choices label
-                oc_w = event.width - self.other_items.winfo_x() - 20
-                self.other_items.place(width=oc_w)
-                # update graph
-                self.update_graph()
-            self.my_w = event.width
-            self.my_h = event.height
+    def do_resize(self, w, h):
+        oc_w = w - self.other_items.winfo_x() - 20
+        self.other_items.place(width=oc_w)
+        # update graph
+        self.update_graph(w, h)
+        self.config(width=w, height=h)
 
     def create_widgets(self):
-        y_plc = 10
+        y_plc = 30
         # Label - "Search for item:"
         self.label_top = Label(self.master, text="Search for items:", anchor=W)
         self.label_top.place(x=10, y=y_plc, width=128, height=24)
@@ -536,14 +504,45 @@ class TreeMapWin(Frame):
         self.other_items.place(x=138+128+10, y=y_plc, height=24)
         y_plc += 24+10
         self.graph_start_y = y_plc
-        self.update_graph(640, 480)
+
+class MainWin(Notebook):
+    def __init__(self, master=None):
+        super().__init__(master)
+        self.master.title("WF Market Hist")
+        self.master.myId = 1
+        self.master.bind("<Configure>", self.on_resize)
+        self.my_w = 0
+        self.my_h = 0
+        self.hist_frame = None
+        self.treemap_frame = None
+        self.create_widgets()
+        self.pack()
+
+    def on_resize(self, event):
+        is_main_window = hasattr(event.widget, 'myId') and (event.widget.myId == 1)
+        main_changed_size = is_main_window and ((event.width != self.my_w) or (event.height != self.my_h))
+        if is_main_window:
+            if main_changed_size:
+                if self.hist_frame:
+                    self.hist_frame.do_resize(event.width, event.height)
+                #if self.treemap_frame:
+                #    self.treemap_frame.do_resize(event.width, event.height)
+            self.my_w = event.width
+            self.my_h = event.height
+
+    def create_widgets(self):
+        self.hist_frame = HistWin(self) #HistWin(self)
+        self.treemap_frame = Frame(self) #TreeMapWin(self)
+        self.add(self.hist_frame, text="Historical View")
+        self.add(self.treemap_frame, text="TreeMap View")
 
 def display_graphs():
     root = Tk()
     root.minsize(640, 480)
     root.geometry("640x480")
-    #app = MainWin(master=root)
-    app = TreeMapWin(master=root)
+    #app = HistWin(master=root)
+    #app = TreeMapWin(master=root)
+    app = MainWin(master=root)
     app.mainloop()
     return None
 
