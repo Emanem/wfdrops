@@ -262,16 +262,13 @@ def do_extract_printout(ev, e_values):
 class HistWin(Frame):
     def __init__(self, master=None):
         super().__init__(master)
-        self.my_w = 0
-        self.my_h = 0
         self.graph = None
         self.canvas = None
-        self.my_item_data = ""
         self.reset_data()
         self.create_widgets()
-        #self.update_graph(100, 100)
 
     def reset_data(self):
+        self.my_item_data = ""
         self.my_x_data = []
         self.my_y1_data = {'min':[], 'avg':[], 'max':[]}
         self.my_y2_data = []
@@ -344,7 +341,7 @@ class HistWin(Frame):
                 l.set_rotation(25)
                 l.set_horizontalalignment('right')
         if self.canvas is None:
-            self.canvas = FigureCanvasTkAgg(self.graph, master=self.master)
+            self.canvas = FigureCanvasTkAgg(self.graph, master=self)
         self.canvas.draw()
         self.canvas.get_tk_widget().config(width=g_w, height=g_h)
         self.canvas.get_tk_widget().place(x=10, y=self.graph_start_y)
@@ -356,19 +353,19 @@ class HistWin(Frame):
         self.config(width=w, height=h)
 
     def create_widgets(self):
-        y_plc = 30
+        y_plc = 10
         # Label - "Search for item:"
-        self.label_top = Label(self.master, text="Search for item:", anchor=W)
+        self.label_top = Label(self, text="Single item:", anchor=W)
         self.label_top.place(x=10, y=y_plc, width=128, height=24)
         # Entry to execute the search
         self.search_val = StringVar()
         self.search_val.trace_add("write", self.search_changed)
-        self.search_entry = Entry(self.master, textvariable=self.search_val)
+        self.search_entry = Entry(self, textvariable=self.search_val)
         self.search_entry.place(x=138, y=y_plc, width=128, height=24)
         # Label to display the other choices
         # don't care about width, we sort it out in 'on_resize'
         self.other_items_val = StringVar()
-        self.other_items = Label(self.master, textvariable=self.other_items_val, anchor=W)
+        self.other_items = Label(self, textvariable=self.other_items_val, anchor=W)
         self.other_items.place(x=138+128+10, y=y_plc, height=24)
         y_plc += 24+10
         self.graph_start_y = y_plc
@@ -430,7 +427,6 @@ class TreeMapWin(Frame):
         self.canvas = None
         self.reset_data()
         self.create_widgets()
-        self.update_graph(100, 100)
 
     def reset_data(self):
         # this should be in the form of [{'id':'val1', 'value':1.0}, {'id':'val2', 'value':0.5}, {'id':'val3', 'value':0.4}]
@@ -475,7 +471,7 @@ class TreeMapWin(Frame):
             ax = self.graph.add_subplot(111)
             treemap_draw(treemap_plot(self.my_tm_data), ax)
         if self.canvas is None:
-            self.canvas = FigureCanvasTkAgg(self.graph, master=self.master)
+            self.canvas = FigureCanvasTkAgg(self.graph, master=self)
         self.canvas.draw()
         self.canvas.get_tk_widget().config(width=g_w, height=g_h)
         self.canvas.get_tk_widget().place(x=10, y=self.graph_start_y)
@@ -488,19 +484,19 @@ class TreeMapWin(Frame):
         self.config(width=w, height=h)
 
     def create_widgets(self):
-        y_plc = 30
+        y_plc = 10
         # Label - "Search for item:"
-        self.label_top = Label(self.master, text="Search for items:", anchor=W)
+        self.label_top = Label(self, text="Multiple items:", anchor=W)
         self.label_top.place(x=10, y=y_plc, width=128, height=24)
         # Entry to execute the search
         self.search_val = StringVar()
         self.search_val.trace_add("write", self.search_changed)
-        self.search_entry = Entry(self.master, textvariable=self.search_val)
+        self.search_entry = Entry(self, textvariable=self.search_val)
         self.search_entry.place(x=138, y=y_plc, width=128, height=24)
         # Label to display the other choices
         # don't care about width, we sort it out in 'on_resize'
         self.other_items_val = StringVar()
-        self.other_items = Label(self.master, textvariable=self.other_items_val, anchor=W)
+        self.other_items = Label(self, textvariable=self.other_items_val, anchor=W)
         self.other_items.place(x=138+128+10, y=y_plc, height=24)
         y_plc += 24+10
         self.graph_start_y = y_plc
@@ -525,14 +521,14 @@ class MainWin(Notebook):
             if main_changed_size:
                 if self.hist_frame:
                     self.hist_frame.do_resize(event.width, event.height)
-                #if self.treemap_frame:
-                #    self.treemap_frame.do_resize(event.width, event.height)
+                if self.treemap_frame:
+                    self.treemap_frame.do_resize(event.width, event.height)
             self.my_w = event.width
             self.my_h = event.height
 
     def create_widgets(self):
-        self.hist_frame = HistWin(self) #HistWin(self)
-        self.treemap_frame = Frame(self) #TreeMapWin(self)
+        self.hist_frame = HistWin(self)
+        self.treemap_frame = TreeMapWin(self)
         self.add(self.hist_frame, text="Historical View")
         self.add(self.treemap_frame, text="TreeMap View")
 
@@ -540,8 +536,6 @@ def display_graphs():
     root = Tk()
     root.minsize(640, 480)
     root.geometry("640x480")
-    #app = HistWin(master=root)
-    #app = TreeMapWin(master=root)
     app = MainWin(master=root)
     app.mainloop()
     return None
