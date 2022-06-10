@@ -6,3 +6,12 @@ Also note this is now pretty much ***work in progress*** and it's quite prototyp
 ## Running it
 Simply invoke _wfdrops_ from command line (for now the python script will scan a copy of the PC Drops). Just needs _python3_,  _python3-tk_ and _python3-matplotlib_ (i.e. `sudo apt install python3 python3-tk python3-matplotlib` on Ubuntu).
 
+# wfmarkethist
+_wfmarkethist_ is a simple script which does many actions:
+
+* download historical market data from _Warframe Market_
+* save it in a local DB 
+* expose funcitonality to extract in CSV format
+* expose GUI to show both the historical prices, volumes and also a treemap of the prices for given items
+
+Run with _-h_ (or _--help_) to find all the options.
