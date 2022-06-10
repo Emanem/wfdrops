@@ -319,7 +319,7 @@ class HistWin(Frame):
             h = self.master.winfo_height()
         dpi = 100
         g_w = (w-20)
-        g_h = (h-self.graph_start_y-10)
+        g_h = (h-self.graph_start_y-35)
         if not self.graph:
             self.graph = Figure(figsize=(g_w/dpi, g_h/dpi), dpi=100)
         else:
@@ -460,7 +460,7 @@ class TreeMapWin(Frame):
             h = self.master.winfo_height()
         dpi = 100
         g_w = (w-20)
-        g_h = (h-self.graph_start_y-10)
+        g_h = (h-self.graph_start_y-35)
         if not self.graph:
             self.graph = Figure(figsize=(g_w/dpi, g_h/dpi), dpi=100)
         else:
