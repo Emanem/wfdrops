@@ -10,9 +10,12 @@ import sys
 import re
 import time
 from tkinter import *
+from tkinter.ttk import Notebook
 from matplotlib.figure import Figure
 import matplotlib.dates as mdates
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+from matplotlib.patches import Rectangle
+import random
 
 G_DB_NAME = "wf_mkt_hist.db"
 G_DB_ITEMS_NAME = "items"
@@ -183,7 +186,12 @@ AND     (
     db.close()
     return rv
 
-def do_summary(n_days=10, min_volume=24, min_price=25):
+def do_summary(n_days=10, min_volume=24, min_price=25, search_nm=[]):
+    items_q = ""
+    for n in search_nm:
+        n_v = re.split(r'\s+', n)
+        n = '%'.join(n_v)
+        items_q += "\tOR x.name LIKE '%" + n + "%'\n"
     query = """
 select x.name, x.a_min, x.a_max, x.a_vol
 from (
@@ -199,17 +207,24 @@ from (
 WHERE	1=1
 AND		x.a_vol >= ?
 AND		x.a_min >= ?
+AND(
+    1=?
+"""
+    query += items_q
+    query += """)
 ORDER BY	x.a_min DESC
 """
     interval_q = "-" + str(n_days) + " days"
     db = sqlite3.connect(G_DB_NAME)
     db_setup(db)
     cur = db.cursor()
-    ri = cur.execute(query, (interval_q, min_volume, min_price))
-    print("name,avg min price,avg max price,avg volume")
+    flag_search = 1 if len(search_nm) == 0 else 0
+    ri = cur.execute(query, (interval_q, min_volume, min_price, flag_search))
+    rv = []
     for v in ri:
-        print(v[0], v[1], v[2], v[3], sep=',')
+        rv.append((v[0], v[1], v[2], v[3]))
     db.close()
+    return rv
 
 def do_extract_printout(ev, e_values):
     # find all the items we have managed to extract
@@ -244,23 +259,16 @@ def do_extract_printout(ev, e_values):
                     print(",", val, sep='', end='')
         print()
 
-class MainWin(Frame):
+class HistWin(Frame):
     def __init__(self, master=None):
         super().__init__(master)
-        self.master = master
-        self.master.title("WF Market Hist")
-        self.master.myId = 1
-        self.master.bind("<Configure>", self.on_resize)
-        self.master.bind_all('<KeyPress>', self.on_key_press)
-        self.my_w = 0
-        self.my_h = 0
         self.graph = None
         self.canvas = None
-        self.my_item_data = ""
         self.reset_data()
         self.create_widgets()
 
     def reset_data(self):
+        self.my_item_data = ""
         self.my_x_data = []
         self.my_y1_data = {'min':[], 'avg':[], 'max':[]}
         self.my_y2_data = []
@@ -287,7 +295,7 @@ class MainWin(Frame):
             return None
         si = sorted_items[0]
         self.my_item_data = si
-        self.other_items_val.set(', '.join(sorted_items))
+        self.other_items_val.set(', '.join(sorted_items)[:2048])
         # extract the time keys only where we have
         # our item
         time_keys = []
@@ -311,7 +319,7 @@ class MainWin(Frame):
             h = self.master.winfo_height()
         dpi = 100
         g_w = (w-20)
-        g_h = (h-self.graph_start_y-10)
+        g_h = (h-self.graph_start_y-35)
         if not self.graph:
             self.graph = Figure(figsize=(g_w/dpi, g_h/dpi), dpi=100)
         else:
@@ -333,53 +341,196 @@ class MainWin(Frame):
                 l.set_rotation(25)
                 l.set_horizontalalignment('right')
         if self.canvas is None:
-            self.canvas = FigureCanvasTkAgg(self.graph, master=self.master)
+            self.canvas = FigureCanvasTkAgg(self.graph, master=self)
         self.canvas.draw()
         self.canvas.get_tk_widget().config(width=g_w, height=g_h)
         self.canvas.get_tk_widget().place(x=10, y=self.graph_start_y)
+
+    def do_resize(self, w, h):
+        oc_w = w - self.other_items.winfo_x() - 20
+        self.other_items.place(width=oc_w)
+        self.update_graph(w, h)
+        self.config(width=w, height=h)
+
+    def create_widgets(self):
+        y_plc = 10
+        # Label - "Search for item:"
+        self.label_top = Label(self, text="Single item:", anchor=W)
+        self.label_top.place(x=10, y=y_plc, width=128, height=24)
+        # Entry to execute the search
+        self.search_val = StringVar()
+        self.search_val.trace_add("write", self.search_changed)
+        self.search_entry = Entry(self, textvariable=self.search_val)
+        self.search_entry.place(x=138, y=y_plc, width=128, height=24)
+        # Label to display the other choices
+        # don't care about width, we sort it out in 'on_resize'
+        self.other_items_val = StringVar()
+        self.other_items = Label(self, textvariable=self.other_items_val, anchor=W)
+        self.other_items.place(x=138+128+10, y=y_plc, height=24)
+        y_plc += 24+10
+        self.graph_start_y = y_plc
+
+# values has to be a list of dictionaries of the form {'id':<string>, 'value':<float>}
+def treemap_plot(values, tl = {'x':0.0, 'y':0.0}, br = {'x':1.0, 'y':1.0}, split_x=True):
+    if 0 == len(values):
+        return []
+    if 1 == len(values):
+        return [{'id':values[0]['id'], 'tl':tl, 'br':br}]
+    else:
+        # recursive step, splitting the list in 2
+        split_s = len(values) // 2
+        v_left = values[:split_s]
+        v_right = values[split_s:]
+        v_left_sum = sum([x['value'] for x in v_left])
+        v_right_sum = sum([x['value'] for x in v_right])
+        w_left = v_left_sum/(v_left_sum + v_right_sum)
+        n_br = {}
+        if split_x:
+            x_sz = br['x'] - tl['x']
+            new_x = tl['x'] + x_sz*w_left
+            n_br['x'] = new_x
+            n_br['y'] = br['y']
+        else:
+            y_sz = br['y'] - tl['y']
+            new_y = tl['y'] + y_sz*w_left
+            n_br['x'] = br['x']
+            n_br['y'] = new_y
+        next_split_x = not split_x
+        if split_x:
+            rv_left = treemap_plot(v_left, tl, n_br, next_split_x)
+            rv_right = treemap_plot(v_right, {'x':n_br['x'], 'y':tl['y']}, br, next_split_x)
+        else:
+            rv_left = treemap_plot(v_left, tl, n_br, next_split_x)
+            rv_right = treemap_plot(v_right, {'x':tl['x'], 'y':n_br['y']}, br, next_split_x)
+        return rv_left + rv_right
+
+# draw a treemap (tm) obtained via treemap_plot and an axis (ax) via
+# matplotlib figure <Figure>.add_subplot(...)
+def treemap_draw(tm, ax):
+    #draw a fake line, fully transparent
+    ax.plot([0, 1], [0, 1], color=[1, 1, 1, 0])
+    ax.set_axis_off()
+    # for consistent colours
+    random.seed(a="123")
+    for el in tm:
+        r = Rectangle((el['tl']['x'], el['tl']['y']), el['br']['x']-el['tl']['x'], el['br']['y']-el['tl']['y'], facecolor=[random.random(), random.random(), random.random()])
+        ax.add_patch(r)
+        rx, ry = r.get_xy()
+        cx = rx + r.get_width()/2.0
+        cy = ry + r.get_height()/2.0
+        ax.annotate(el['id'], (cx, cy), ha='center', va='center')
+
+class TreeMapWin(Frame):
+    def __init__(self, master=None):
+        super().__init__(master)
+        self.graph = None
+        self.canvas = None
+        self.reset_data()
+        self.create_widgets()
+
+    def reset_data(self):
+        # this should be in the form of [{'id':'val1', 'value':1.0}, {'id':'val2', 'value':0.5}, {'id':'val3', 'value':0.4}]
+        self.my_tm_data = []
+
+    def search_changed(self, *args):
+        v = self.search_val.get()
+        if len(v) <= 0:
+            self.other_items_val.set("")
+            self.reset_data()
+            self.update_graph()
+            return None
+        items = [x for x in v.split(',') if len(x) > 0]
+        ev = do_summary(min_volume=10, min_price=0, search_nm=items)
+        # get the first item in alphabetical order
+        ev.sort()
+        if not ev:
+            self.other_items_val.set("<no suggestions available>")
+            self.reset_data()
+            self.update_graph()
+            return None
+        self.other_items_val.set(', '.join([x[0] for x in ev])[:2048])
+        self.reset_data()
+        for e in ev:
+            self.my_tm_data.append({'id':e[0], 'value':e[1]})
+        self.update_graph()
+
+    def update_graph(self, w=0, h=0):
+        if (w == 0) or (h == 0):
+            w = self.master.winfo_width()
+            h = self.master.winfo_height()
+        dpi = 100
+        g_w = (w-20)
+        g_h = (h-self.graph_start_y-35)
+        if not self.graph:
+            self.graph = Figure(figsize=(g_w/dpi, g_h/dpi), dpi=100)
+        else:
+            self.graph.clear()
+            self.graph.set_figwidth(g_w/dpi)
+            self.graph.set_figheight(g_h/dpi)
+        if self.my_tm_data:
+            ax = self.graph.add_subplot(111)
+            treemap_draw(treemap_plot(self.my_tm_data), ax)
+        if self.canvas is None:
+            self.canvas = FigureCanvasTkAgg(self.graph, master=self)
+        self.canvas.draw()
+        self.canvas.get_tk_widget().config(width=g_w, height=g_h)
+        self.canvas.get_tk_widget().place(x=10, y=self.graph_start_y)
+
+    def do_resize(self, w, h):
+        oc_w = w - self.other_items.winfo_x() - 20
+        self.other_items.place(width=oc_w)
+        # update graph
+        self.update_graph(w, h)
+        self.config(width=w, height=h)
+
+    def create_widgets(self):
+        y_plc = 10
+        # Label - "Search for item:"
+        self.label_top = Label(self, text="Multiple items:", anchor=W)
+        self.label_top.place(x=10, y=y_plc, width=128, height=24)
+        # Entry to execute the search
+        self.search_val = StringVar()
+        self.search_val.trace_add("write", self.search_changed)
+        self.search_entry = Entry(self, textvariable=self.search_val)
+        self.search_entry.place(x=138, y=y_plc, width=128, height=24)
+        # Label to display the other choices
+        # don't care about width, we sort it out in 'on_resize'
+        self.other_items_val = StringVar()
+        self.other_items = Label(self, textvariable=self.other_items_val, anchor=W)
+        self.other_items.place(x=138+128+10, y=y_plc, height=24)
+        y_plc += 24+10
+        self.graph_start_y = y_plc
+
+class MainWin(Notebook):
+    def __init__(self, master=None):
+        super().__init__(master)
+        self.master.title("WF Market Hist")
+        self.master.myId = 1
+        self.master.bind("<Configure>", self.on_resize)
+        self.my_w = 0
+        self.my_h = 0
+        self.hist_frame = None
+        self.treemap_frame = None
+        self.create_widgets()
+        self.pack()
 
     def on_resize(self, event):
         is_main_window = hasattr(event.widget, 'myId') and (event.widget.myId == 1)
         main_changed_size = is_main_window and ((event.width != self.my_w) or (event.height != self.my_h))
         if is_main_window:
             if main_changed_size:
-                # update the width of other choices label
-                oc_w = event.width - self.other_items.winfo_x() - self.quit.winfo_width() - 20
-                self.other_items.place(width=oc_w)
-                # update quit button place
-                q_pos_x = self.master.winfo_width() - 10 - self.quit.winfo_width()
-                self.quit.place(x=q_pos_x)
-                # update graph
-                self.update_graph()
+                if self.hist_frame:
+                    self.hist_frame.do_resize(event.width, event.height)
+                if self.treemap_frame:
+                    self.treemap_frame.do_resize(event.width, event.height)
             self.my_w = event.width
             self.my_h = event.height
 
-    def on_key_press(self, event):
-        if event.keysym == 'Escape':
-            self.master.destroy()
-
     def create_widgets(self):
-        y_plc = 10
-        # Label - "Search for item:"
-        self.label_top = Label(self.master, text="Search for item:", anchor=W)
-        self.label_top.place(x=10, y=y_plc, width=128, height=24)
-        # Entry to execute the search
-        self.search_val = StringVar()
-        self.search_val.trace_add("write", self.search_changed)
-        self.search_entry = Entry(self.master, textvariable=self.search_val)
-        self.search_entry.place(x=138, y=y_plc, width=128, height=24)
-        # Label to display the other choices
-        # don't care about width, we sort it out in 'on_resize'
-        self.other_items_val = StringVar()
-        self.other_items = Label(self.master, textvariable=self.other_items_val, anchor=W)
-        self.other_items.place(x=138+128+10, y=y_plc, height=24)
-        # Button - "Quit" don't care about x location
-        # we sort it out automatically in 'on_resize'
-        self.quit = Button(self.master, text="Quit", command=self.master.destroy)
-        self.quit.place(x=0, y=y_plc, height=24)
-        y_plc += 24+10
-        self.graph_start_y = y_plc
-        self.update_graph(640, 480)
+        self.hist_frame = HistWin(self)
+        self.treemap_frame = TreeMapWin(self)
+        self.add(self.hist_frame, text="Historical View")
+        self.add(self.treemap_frame, text="TreeMap View")
 
 def display_graphs():
     root = Tk()
@@ -513,7 +664,10 @@ Usage: (options) item1, item2, ...
         for i in l_items.keys():
             print(i)
     elif exec_mode == 'm':
-        do_summary(n_days=s_n_days, min_volume=s_min_volume, min_price=s_min_price)
+        rv = do_summary(n_days=s_n_days, min_volume=s_min_volume, min_price=s_min_price)
+        print("name,avg min price,avg max price,avg volume")
+        for v in rv:
+            print(v[0], v[1], v[2], v[3], sep=',')
 
 if __name__ == "__main__":
     main()
