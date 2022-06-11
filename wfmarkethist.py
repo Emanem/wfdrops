@@ -185,7 +185,7 @@ def get_items_list(search_nm, get_all=False):
                 rv[k['item_name']] = k['url_name']
     return rv
 
-def do_extract(search_nm, e_values, wildcard_ws=False):
+def do_extract(search_nm, e_values, tags=[], wildcard_ws=False):
     query = """
 SELECT  i.name as name, h.ts as ts
 """
@@ -196,7 +196,23 @@ SELECT  i.name as name, h.ts as ts
     query += """
 FROM    items i
 JOIN    hist h
-ON      (i.rowid=h.id)
+ON      (i.rowid=h.id)"""
+    if tags:
+        query_tags = """
+JOIN    (
+    SELECT  ia.item_id
+    FROM    items_attrs ia
+    JOIN    tags t
+    ON (ia.tag_id=t.rowid)
+    WHERE   1=1
+    AND     t.name IN ("""
+        query_tags += """
+    )
+    GROUP BY ia.item_id
+) t_ ON (i.rowid=t_.item_id)
+"""
+        query += query_tags
+    query += """
 WHERE   1=1
 AND     (
         1=0
