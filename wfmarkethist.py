@@ -56,6 +56,14 @@ def db_fetch_ts(db, nm_id):
         rv[datetime.datetime.fromisoformat(i[0])] = 1
     return rv
 
+def db_fetch_names_tags(db):
+    cur = db.cursor()
+    ri = cur.execute("SELECT n.name, COUNT(n.name) as total FROM " + G_DB_ITEMS_NAME + " n JOIN " + G_DB_ITEMS_TAGS + " i ON (n.rowid=i.item_id) GROUP BY n.name")
+    rv = {}
+    for i in ri:
+        rv[i[0]] = i[1]
+    return rv
+
 def db_insert_raw_data(db, all_data):
     nm_id = db_fetch_names(db, G_DB_ITEMS_NAME, all_data.keys())
     cur = db.cursor()
@@ -109,18 +117,26 @@ def get_wfm_webapi(str_url, https_cp):
     f = https_cp.urlopen('GET', str_url, headers={'User-Agent': G_WFM_USER_AGENT})
     return f.data.decode('utf-8')
 
-def get_hist_stats(item_name, https_cp, https_cp_api):
+def get_hist_stats(item_name, https_cp, https_cp_api, query_metadata):
     str_url = '/items/' + item_name + '/statistics'
     data = get_wfm_webapi(str_url, https_cp)
-    time.sleep(G_SLEEP_THROTTLE)
-    str_url = '/v1/items/' + item_name
-    data_attrs = get_wfm_webapi(str_url, https_cp_api)
-    return (parse_hist_stats(data), parse_attrs(data_attrs))
+    tags = []
+    if query_metadata:
+        time.sleep(G_SLEEP_THROTTLE)
+        str_url = '/v1/items/' + item_name
+        data_attrs = get_wfm_webapi(str_url, https_cp_api)
+        tags = parse_attrs(data_attrs)
+    return (parse_hist_stats(data), tags)
 
 def store_hist_data(item_names):
     print("\tFetching:")
     all_items = {}
     n_digits = len(str(len(item_names.keys())))
+    # have to init the DB connection here
+    # to optimize skipping existing tags
+    db = sqlite3.connect(G_DB_NAME)
+    db_setup(db)
+    items_tags = db_fetch_names_tags(db)
     cnt = 0
     # create the HTTPS pool here
     https_cp = urllib3.HTTPSConnectionPool('warframe.market')
@@ -131,7 +147,8 @@ def store_hist_data(item_names):
         print(nm, end='...')
         tm_start = time.monotonic()
         try:
-            all_items[nm] = get_hist_stats(q_nm, https_cp, https_cp_api)
+            # optimization: only query metadata when we don't have tags
+            all_items[nm] = get_hist_stats(q_nm, https_cp, https_cp_api, nm not in items_tags)
         except Exception as e:
             print("Error, carrying on (", e, ")")
         else:
@@ -143,8 +160,7 @@ def store_hist_data(item_names):
             sleep_throttle = G_SLEEP_THROTTLE - (tm_end - tm_start)
             if sleep_throttle > 0.0:
                 time.sleep(sleep_throttle)
-    db = sqlite3.connect(G_DB_NAME)
-    db_setup(db)
+    # perform insertion of all data
     rv = db_insert_raw_data(db, all_items)
     db.close()
     return rv
