@@ -128,7 +128,7 @@ def get_hist_stats(item_name, https_cp, https_cp_api, query_metadata):
         tags = parse_attrs(data_attrs)
     return (parse_hist_stats(data), tags)
 
-def store_hist_data(item_names):
+def store_hist_data(item_names, force_metadata=False):
     print("\tFetching:")
     all_items = {}
     n_digits = len(str(len(item_names.keys())))
@@ -136,7 +136,7 @@ def store_hist_data(item_names):
     # to optimize skipping existing tags
     db = sqlite3.connect(G_DB_NAME)
     db_setup(db)
-    items_tags = db_fetch_names_tags(db)
+    items_tags = db_fetch_names_tags(db) if not force_metadata else {}
     cnt = 0
     # create the HTTPS pool here
     https_cp = urllib3.HTTPSConnectionPool('warframe.market')
@@ -589,7 +589,7 @@ def display_graphs():
 
 def main():
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "gueshx", ["update-detail", "update-all", "graphs", "update", "extract", "summary", "summary-days=", "summary-any", "search", "help", "values="])
+        opts, args = getopt.getopt(sys.argv[1:], "gueshx", ["force-tags", "update-detail", "update-all", "graphs", "update", "extract", "summary", "summary-days=", "summary-any", "search", "help", "values="])
     except getopt.GetoptError as err:
         print(err)
         sys.exit(-1)
@@ -600,6 +600,7 @@ def main():
     s_min_price = 25
     update_all = False
     update_detail = False
+    force_tags = False
     for o, a in opts:
         if o in ("-g", "--graphs"):
             exec_mode = 'g'
@@ -610,6 +611,8 @@ def main():
             update_all = True
         elif o in ("--update-detail"):
             update_detail = True
+        elif o in ("--force-tags"):
+            force_tags = True
         elif o in ("-e", "--extract"):
             exec_mode = 'e'
         elif o in ("-s", "--search"):
@@ -630,6 +633,9 @@ Usage: (options) item1, item2, ...
 
 --update-detail Print individual item timeseries details when updating.
                 By default this is off.
+
+--force-tags    Force querying for items metadata even if already stored (it
+                should rarely change)
 
 -e, --extract   Extract historic price data for the given items from the
                 local SQLite database
@@ -695,7 +701,7 @@ Usage: (options) item1, item2, ...
         print("\tAdding/Updating:")
         for i in items.keys():
             print(i)
-        rv = store_hist_data(items)
+        rv = store_hist_data(items, force_tags)
         if update_detail:
             print("\tEntries added:")
             for i in rv:
