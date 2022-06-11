@@ -16,6 +16,7 @@ import matplotlib.dates as mdates
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.patches import Rectangle
 import random
+import math
 
 G_DB_NAME = "wf_mkt_hist.db"
 G_DB_ITEMS_NAME = "items"
@@ -451,7 +452,7 @@ class TreeMapWin(Frame):
         self.other_items_val.set(', '.join([x[0] for x in ev])[:2048])
         self.reset_data()
         for e in ev:
-            self.my_tm_data.append({'id':e[0], 'value':e[1]})
+            self.my_tm_data.append({'id':e[0], 'value':(e[1] if self.vol_w_check.get() == 0 else e[1]*math.sqrt(e[3]))})
         self.update_graph()
 
     def update_graph(self, w=0, h=0):
@@ -477,8 +478,11 @@ class TreeMapWin(Frame):
         self.canvas.get_tk_widget().place(x=10, y=self.graph_start_y)
 
     def do_resize(self, w, h):
-        oc_w = w - self.other_items.winfo_x() - 20
+        oc_w = w - self.other_items.winfo_x() - self.vol_w_cb.winfo_width() - 20
         self.other_items.place(width=oc_w)
+        # volume w. checkbox on the right hand side
+        vw_x = w - 10 - self.vol_w_cb.winfo_width()
+        self.vol_w_cb.place(x=vw_x)
         # update graph
         self.update_graph(w, h)
         self.config(width=w, height=h)
@@ -498,6 +502,10 @@ class TreeMapWin(Frame):
         self.other_items_val = StringVar()
         self.other_items = Label(self, textvariable=self.other_items_val, anchor=W)
         self.other_items.place(x=138+128+10, y=y_plc, height=24)
+        # values for the volume weight in the results
+        self.vol_w_check = IntVar()
+        self.vol_w_cb = Checkbutton(self, text="Volume w.", var=self.vol_w_check, command=self.search_changed)
+        self.vol_w_cb.place(y=y_plc, height=24)
         y_plc += 24+10
         self.graph_start_y = y_plc
 
