@@ -21,6 +21,8 @@ import math
 G_DB_NAME = "wf_mkt_hist.db"
 G_DB_ITEMS_NAME = "items"
 G_DB_ITEMS_HIST = "hist"
+G_DB_TAGS_NAME = "tags"
+G_DB_ITEMS_TAGS = "items_attrs"
 G_WFM_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36'
 G_SLEEP_THROTTLE = 0.5
 
@@ -29,17 +31,19 @@ def db_setup(db):
     cur.execute("CREATE TABLE IF NOT EXISTS " + G_DB_ITEMS_NAME + " (name text)")
     cur.execute("CREATE TABLE IF NOT EXISTS " + G_DB_ITEMS_HIST + " (id integer, ts timestamp, volume integer, min integer, max integer, open integer, close integer, avg real, w_avg real, median real, m_avg real)")
     cur.execute("CREATE INDEX IF NOT EXISTS i1 ON " + G_DB_ITEMS_HIST + "(id)")
+    cur.execute("CREATE TABLE IF NOT EXISTS " + G_DB_TAGS_NAME + " (name text)")
+    cur.execute("CREATE TABLE IF NOT EXISTS " + G_DB_ITEMS_TAGS + " (item_id integer, tag_id integer)")
     db.commit()
     return None
 
-def db_fetch_names(db, nm):
+def db_fetch_names(db, tb_nm, nm):
     cur = db.cursor()
     for i in nm:
-        q = "INSERT INTO " + G_DB_ITEMS_NAME + "(name) SELECT ? WHERE NOT EXISTS (SELECT 1 FROM " + G_DB_ITEMS_NAME + " WHERE name=?)";
+        q = "INSERT INTO " + tb_nm + "(name) SELECT ? WHERE NOT EXISTS (SELECT 1 FROM " + tb_nm + " WHERE name=?)";
         cur.execute(q, (i, i))
     db.commit()
     rv = {}
-    ri = cur.execute("SELECT MAX(rowid) as id, name FROM " + G_DB_ITEMS_NAME + " WHERE 1=1 GROUP BY name")
+    ri = cur.execute("SELECT MAX(rowid) as id, name FROM " + tb_nm + " WHERE 1=1 GROUP BY name")
     for i in ri:
         rv[i[1]] = i[0]
     return rv
@@ -52,19 +56,34 @@ def db_fetch_ts(db, nm_id):
         rv[datetime.datetime.fromisoformat(i[0])] = 1
     return rv
 
+def db_fetch_names_tags(db):
+    cur = db.cursor()
+    ri = cur.execute("SELECT n.name, COUNT(n.name) as total FROM " + G_DB_ITEMS_NAME + " n JOIN " + G_DB_ITEMS_TAGS + " i ON (n.rowid=i.item_id) GROUP BY n.name")
+    rv = {}
+    for i in ri:
+        rv[i[0]] = i[1]
+    return rv
+
 def db_insert_raw_data(db, all_data):
-    nm_id = db_fetch_names(db, all_data.keys())
+    nm_id = db_fetch_names(db, G_DB_ITEMS_NAME, all_data.keys())
     cur = db.cursor()
     rv_stats = {}
     for k, v in all_data.items():
         rv_stats[k] = 0
         # select all dates for given item
+        # and insert missing dates
         all_ts = db_fetch_ts(db, nm_id[k])
-        for r in v:
+        for r in v[0]:
             if r[0] in all_ts.keys():
                 continue
             cur.execute("INSERT INTO " + G_DB_ITEMS_HIST + " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (nm_id[k], r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9]))
             rv_stats[k] = rv_stats[k]+1
+        # push all the tags - we're fetching more than
+        # required but it's ok for now
+        cur_tags = db_fetch_names(db, G_DB_TAGS_NAME, v[1])
+        # add the tags for a given item
+        for r in v[1]:
+            cur.execute("INSERT INTO " + G_DB_ITEMS_TAGS + "(item_id, tag_id) SELECT ?, ? WHERE NOT EXISTS (SELECT 1 FROM " + G_DB_ITEMS_TAGS + " WHERE item_id=? and tag_id=?)", (nm_id[k], cur_tags[r], nm_id[k], cur_tags[r]))
     db.commit()
     return rv_stats
 
@@ -86,42 +105,62 @@ def parse_hist_stats(data):
             rv.append((datetime.datetime.fromisoformat(x['datetime']), int(x['volume']), int(x['min_price']), int(x['max_price']), int(x['open_price']), int(x['closed_price']), float(x['avg_price']), float(x['wa_price']), float(x['median']), float(x.get('moving_avg', 0.0))))
     return rv
 
+def parse_attrs(data):
+    jdata = json.loads(data)
+    rv = {}
+    for x in jdata['payload']['item']['items_in_set']:
+        for y in x['tags']:
+            rv[y] = 1
+    return list(rv.keys())
+
 def get_wfm_webapi(str_url, https_cp):
     f = https_cp.urlopen('GET', str_url, headers={'User-Agent': G_WFM_USER_AGENT})
     return f.data.decode('utf-8')
 
-def get_hist_stats(item_name, https_cp):
+def get_hist_stats(item_name, https_cp, https_cp_api, query_metadata):
     str_url = '/items/' + item_name + '/statistics'
     data = get_wfm_webapi(str_url, https_cp)
-    return parse_hist_stats(data)
+    tags = []
+    if query_metadata:
+        time.sleep(G_SLEEP_THROTTLE)
+        str_url = '/v1/items/' + item_name
+        data_attrs = get_wfm_webapi(str_url, https_cp_api)
+        tags = parse_attrs(data_attrs)
+    return (parse_hist_stats(data), tags)
 
-def store_hist_data(item_names):
+def store_hist_data(item_names, force_metadata=False):
     print("\tFetching:")
     all_items = {}
     n_digits = len(str(len(item_names.keys())))
+    # have to init the DB connection here
+    # to optimize skipping existing tags
+    db = sqlite3.connect(G_DB_NAME)
+    db_setup(db)
+    items_tags = db_fetch_names_tags(db) if not force_metadata else {}
     cnt = 0
     # create the HTTPS pool here
     https_cp = urllib3.HTTPSConnectionPool('warframe.market')
+    https_cp_api = urllib3.HTTPSConnectionPool('api.warframe.market')
     for nm, q_nm in item_names.items():
         cnt += 1
         print("[{count:{fill}{align}{width}}/{total}]".format(count=cnt, total=len(item_names), fill=' ', align='>', width=n_digits), end='\t')
         print(nm, end='...')
         tm_start = time.monotonic()
         try:
-            all_items[nm] = get_hist_stats(q_nm, https_cp)
+            # optimization: only query metadata when we don't have tags
+            all_items[nm] = get_hist_stats(q_nm, https_cp, https_cp_api, nm not in items_tags)
         except Exception as e:
             print("Error, carrying on (", e, ")")
         else:
             # this is not great - but it does work...
             tm_end = time.monotonic()
-            print('done', tm_end-tm_start, 's', "(" + str(len(all_items[nm])) + " entries)")
+            print('done', tm_end-tm_start, 's', "(" + str(len(all_items[nm][0])) + " entries)")
         finally:
             tm_end = time.monotonic()
             sleep_throttle = G_SLEEP_THROTTLE - (tm_end - tm_start)
             if sleep_throttle > 0.0:
                 time.sleep(sleep_throttle)
-    db = sqlite3.connect(G_DB_NAME)
-    db_setup(db)
+    # perform insertion of all data
     rv = db_insert_raw_data(db, all_items)
     db.close()
     return rv
@@ -146,7 +185,7 @@ def get_items_list(search_nm, get_all=False):
                 rv[k['item_name']] = k['url_name']
     return rv
 
-def do_extract(search_nm, e_values, wildcard_ws=False):
+def do_extract(search_nm, e_values, *, tags=[], wildcard_ws=False):
     query = """
 SELECT  i.name as name, h.ts as ts
 """
@@ -157,8 +196,26 @@ SELECT  i.name as name, h.ts as ts
     query += """
 FROM    items i
 JOIN    hist h
-ON      (i.rowid=h.id)
-WHERE   1=1
+ON      (i.rowid=h.id)"""
+    if tags:
+        query_tags = """
+JOIN    (
+    SELECT  ia.item_id
+    FROM    items_attrs ia
+    JOIN    tags t
+    ON (ia.tag_id=t.rowid)
+    WHERE   1=1
+    AND     LOWER(t.name) IN ("""
+        query_tags += ', '.join(["LOWER('" + x + "')" for x in tags])
+        query_tags += """)
+    GROUP BY ia.item_id"""
+        query_tags += """
+    HAVING COUNT(0)>=""" + str(len(tags))
+        query_tags += """
+) t_ ON (i.rowid=t_.item_id)
+"""
+        query += query_tags
+    query += """WHERE   1=1
 AND     (
         1=0
 """
@@ -168,6 +225,9 @@ AND     (
             n_v = re.split(r'\s+', n)
             n = '%'.join(n_v)
         items_q += "\tOR i.name LIKE '%" + n + "%'\n"
+    # if we have tags do select even if search_nm is empty
+    if tags and not search_nm:
+        items_q = "\tOR 1=1\n"
     query += items_q
     query += ")"
     db = sqlite3.connect(G_DB_NAME)
@@ -187,7 +247,18 @@ AND     (
     db.close()
     return rv
 
-def do_summary(n_days=10, min_volume=24, min_price=25, search_nm=[]):
+def do_extract_tags():
+    db = sqlite3.connect(G_DB_NAME)
+    db_setup(db)
+    cur = db.cursor()
+    ri = cur.execute("SELECT name FROM " + G_DB_TAGS_NAME + " GROUP BY name")
+    rv = []
+    for v in ri:
+        rv.append(v[0])
+    db.close()
+    return rv
+
+def do_summary(n_days=10, min_volume=24, min_price=25, search_nm=[], search_tags=[]):
     items_q = ""
     for n in search_nm:
         n_v = re.split(r'\s+', n)
@@ -196,15 +267,34 @@ def do_summary(n_days=10, min_volume=24, min_price=25, search_nm=[]):
     query = """
 select x.name, x.a_min, x.a_max, x.a_vol
 from (
-	select 	i.name, avg(volume) as a_vol, avg(min) as a_min, avg(max) as a_max
+	select 	i.ROWID, i.name, avg(volume) as a_vol, avg(min) as a_min, avg(max) as a_max
 	FROM	items i
 	JOIN	hist h
 	ON		(i.ROWID=h.id)
 	WHERE	1=1
 	AND		h.ts > DATE('now', ?)
 	AND		NOT i.name LIKE '%set'
-	GROUP BY	i.name
-) x
+	GROUP BY	i.ROWID, i.name
+) x"""
+    if search_tags:
+        query_tags = """
+JOIN    (
+    SELECT  ia.item_id
+    FROM    items_attrs ia
+    JOIN    tags t
+    ON (ia.tag_id=t.rowid)
+    WHERE   1=1
+    AND     LOWER(t.name) IN ("""
+        query_tags += ', '.join(["LOWER('" + x + "')" for x in search_tags])
+        query_tags += """)
+    GROUP BY ia.item_id"""
+        query_tags += """
+    HAVING COUNT(0)>=""" + str(len(search_tags))
+        query_tags += """
+) t_ ON (x.rowid=t_.item_id)
+"""
+        query += query_tags
+    query += """
 WHERE	1=1
 AND		x.a_vol >= ?
 AND		x.a_min >= ?
@@ -281,7 +371,7 @@ class HistWin(Frame):
             self.reset_data()
             self.update_graph()
             return None
-        ev = do_extract([v], ['volume', 'min', 'avg', 'max'], True)
+        ev = do_extract([v], ['volume', 'min', 'avg', 'max'], wildcard_ws=True)
         # get the first item in alphabetical order
         all_items = {}
         for k, v in ev.items():
@@ -295,7 +385,6 @@ class HistWin(Frame):
             self.update_graph()
             return None
         si = sorted_items[0]
-        self.my_item_data = si
         self.other_items_val.set(', '.join(sorted_items)[:2048])
         # extract the time keys only where we have
         # our item
@@ -305,6 +394,7 @@ class HistWin(Frame):
                 time_keys.append(k)
         time_keys.sort()
         self.reset_data()
+        self.my_item_data = si
         for k in time_keys:
             v = ev[k]
             self.my_x_data.append(k)
@@ -421,11 +511,40 @@ def treemap_draw(tm, ax):
         cy = ry + r.get_height()/2.0
         ax.annotate(el['id'], (cx, cy), ha='center', va='center')
 
+class TagsPicker(Frame):
+    def __init__(self, master, treemap):
+        super().__init__(master)
+        self.tags = do_extract_tags()
+        self.tm = treemap
+        self.create_widgets()
+        self.pack(expand=Y, fill=Y)
+
+    def on_apply(self):
+        self.tm.tags = [self.tags[x] for x in self.lb.curselection()]
+        self.tm.search_changed()
+        self.master.destroy()
+
+    def create_widgets(self):
+        self.ysb = Scrollbar(self)
+        self.ysb.pack(side = RIGHT, fill = Y)
+        #
+        self.lb = Listbox(self, selectmode="multiple", yscrollcommand = self.ysb.set)
+        self.lb.pack(padx = 10, pady = 10, expand = YES, fill = "both")
+        for i in range(len(self.tags)):
+            self.lb.insert(END, self.tags[i])
+            if self.tags[i] in self.tm.tags:
+                self.lb.selection_set(i)
+        self.ysb.config(command = self.lb.yview)
+        #
+        self.btn_apply = Button(self, text="Apply", command=self.on_apply)
+        self.btn_apply.pack()
+
 class TreeMapWin(Frame):
     def __init__(self, master=None):
         super().__init__(master)
         self.graph = None
         self.canvas = None
+        self.tags = []
         self.reset_data()
         self.create_widgets()
 
@@ -433,15 +552,19 @@ class TreeMapWin(Frame):
         # this should be in the form of [{'id':'val1', 'value':1.0}, {'id':'val2', 'value':0.5}, {'id':'val3', 'value':0.4}]
         self.my_tm_data = []
 
+    def btn_tags(self):
+        root = Toplevel()
+        tp = TagsPicker(root, self)
+
     def search_changed(self, *args):
         v = self.search_val.get()
-        if len(v) <= 0:
+        if len(v) <= 0 and not self.tags:
             self.other_items_val.set("")
             self.reset_data()
             self.update_graph()
             return None
         items = [x for x in v.split(',') if len(x) > 0]
-        ev = do_summary(min_volume=10, min_price=0, search_nm=items)
+        ev = do_summary(min_volume=10, min_price=0, search_nm=items, search_tags=self.tags)
         # get the first item in alphabetical order
         ev.sort()
         if not ev:
@@ -471,6 +594,8 @@ class TreeMapWin(Frame):
         if self.my_tm_data:
             ax = self.graph.add_subplot(111)
             treemap_draw(treemap_plot(self.my_tm_data), ax)
+            if self.tags:
+                ax.set_title("Tags: " + ', '.join(self.tags))
         if self.canvas is None:
             self.canvas = FigureCanvasTkAgg(self.graph, master=self)
         self.canvas.draw()
@@ -478,11 +603,14 @@ class TreeMapWin(Frame):
         self.canvas.get_tk_widget().place(x=10, y=self.graph_start_y)
 
     def do_resize(self, w, h):
-        oc_w = w - self.other_items.winfo_x() - self.vol_w_cb.winfo_width() - 20
+        oc_w = w - self.other_items.winfo_x() - self.vol_w_cb.winfo_width() - 30 - self.btn_tags.winfo_width()
         self.other_items.place(width=oc_w)
         # volume w. checkbox on the right hand side
-        vw_x = w - 10 - self.vol_w_cb.winfo_width()
+        vw_x = w - 10 - self.vol_w_cb.winfo_width() - 10 - self.btn_tags.winfo_width()
         self.vol_w_cb.place(x=vw_x)
+        # tag button on the rightmost side
+        tagb_x = w - 10 - self.btn_tags.winfo_width()
+        self.btn_tags.place(x=tagb_x)
         # update graph
         self.update_graph(w, h)
         self.config(width=w, height=h)
@@ -506,6 +634,9 @@ class TreeMapWin(Frame):
         self.vol_w_check = IntVar()
         self.vol_w_cb = Checkbutton(self, text="Volume w.", var=self.vol_w_check, command=self.search_changed)
         self.vol_w_cb.place(y=y_plc, height=24)
+        # button to display pop-up to set tags
+        self.btn_tags = Button(self, text="Select tags", command=self.btn_tags)
+        self.btn_tags.place(y=y_plc, height=24)
         y_plc += 24+10
         self.graph_start_y = y_plc
 
@@ -550,7 +681,7 @@ def display_graphs():
 
 def main():
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "gueshx", ["update-detail", "update-all", "graphs", "update", "extract", "summary", "summary-days=", "summary-any", "search", "help", "values="])
+        opts, args = getopt.getopt(sys.argv[1:], "gueshx", ["show-tags", "tags=", "force-tags", "update-detail", "update-all", "graphs", "update", "extract", "summary", "summary-days=", "summary-any", "search", "help", "values="])
     except getopt.GetoptError as err:
         print(err)
         sys.exit(-1)
@@ -561,6 +692,8 @@ def main():
     s_min_price = 25
     update_all = False
     update_detail = False
+    force_tags = False
+    tags = []
     for o, a in opts:
         if o in ("-g", "--graphs"):
             exec_mode = 'g'
@@ -571,8 +704,14 @@ def main():
             update_all = True
         elif o in ("--update-detail"):
             update_detail = True
+        elif o in ("--force-tags"):
+            force_tags = True
         elif o in ("-e", "--extract"):
             exec_mode = 'e'
+        elif o in ("--tags"):
+            tags = a.split(",")
+        elif o in ("--show-tags"):
+            exec_mode = 't'
         elif o in ("-s", "--search"):
             exec_mode = 's'
         elif o in ("-h", "--help"):
@@ -592,6 +731,9 @@ Usage: (options) item1, item2, ...
 --update-detail Print individual item timeseries details when updating.
                 By default this is off.
 
+--force-tags    Force querying for items metadata even if already stored (it
+                should rarely change)
+
 -e, --extract   Extract historic price data for the given items from the
                 local SQLite database
 
@@ -607,6 +749,12 @@ Usage: (options) item1, item2, ...
                 - median
                 - m_avg
                 Specifying any value using this option implies option '-e'
+
+--tags t1,...   Specify which tags to be extracted; tags are dynamic; to show
+                what tags are available, please run with '--show-tags'
+                Setting this option doesn't imply not '-e' nor '-x'
+
+--show-tags     Shows available tags and quits
 
 -s, --search    Search remote warframe market for given items
 
@@ -656,7 +804,7 @@ Usage: (options) item1, item2, ...
         print("\tAdding/Updating:")
         for i in items.keys():
             print(i)
-        rv = store_hist_data(items)
+        rv = store_hist_data(items, force_tags)
         if update_detail:
             print("\tEntries added:")
             for i in rv:
@@ -671,7 +819,7 @@ Usage: (options) item1, item2, ...
         for i in dist:
             print(dist[i], "->", i)
     elif exec_mode == 'e':
-        ev = do_extract(args, extract_values)
+        ev = do_extract(args, extract_values, tags)
         do_extract_printout(ev, extract_values)
     elif exec_mode == 's':
         l_items = get_items_list(args)
@@ -679,10 +827,15 @@ Usage: (options) item1, item2, ...
         for i in l_items.keys():
             print(i)
     elif exec_mode == 'm':
-        rv = do_summary(n_days=s_n_days, min_volume=s_min_volume, min_price=s_min_price)
+        rv = do_summary(n_days=s_n_days, min_volume=s_min_volume, min_price=s_min_price, search_tags=tags)
         print("name,avg min price,avg max price,avg volume")
         for v in rv:
             print(v[0], v[1], v[2], v[3], sep=',')
+    elif exec_mode == 't':
+        ev = do_extract_tags()
+        print("\tTags:")
+        for t in ev:
+            print(t)
 
 if __name__ == "__main__":
     main()
