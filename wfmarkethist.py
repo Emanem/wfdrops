@@ -385,7 +385,6 @@ class HistWin(Frame):
             self.update_graph()
             return None
         si = sorted_items[0]
-        self.my_item_data = si
         self.other_items_val.set(', '.join(sorted_items)[:2048])
         # extract the time keys only where we have
         # our item
@@ -395,6 +394,7 @@ class HistWin(Frame):
                 time_keys.append(k)
         time_keys.sort()
         self.reset_data()
+        self.my_item_data = si
         for k in time_keys:
             v = ev[k]
             self.my_x_data.append(k)
