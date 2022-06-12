@@ -207,8 +207,7 @@ JOIN    (
     WHERE   1=1
     AND     LOWER(t.name) IN ("""
         query_tags += ', '.join(["LOWER('" + x + "')" for x in tags])
-        query_tags += """
-    )
+        query_tags += """)
     GROUP BY ia.item_id"""
         query_tags += """
     HAVING COUNT(0)>=""" + str(len(tags))
@@ -259,7 +258,7 @@ def do_extract_tags():
     db.close()
     return rv
 
-def do_summary(n_days=10, min_volume=24, min_price=25, search_nm=[]):
+def do_summary(n_days=10, min_volume=24, min_price=25, search_nm=[], search_tags=[]):
     items_q = ""
     for n in search_nm:
         n_v = re.split(r'\s+', n)
@@ -268,16 +267,34 @@ def do_summary(n_days=10, min_volume=24, min_price=25, search_nm=[]):
     query = """
 select x.name, x.a_min, x.a_max, x.a_vol
 from (
-	select 	i.name, avg(volume) as a_vol, avg(min) as a_min, avg(max) as a_max
+	select 	i.ROWID, i.name, avg(volume) as a_vol, avg(min) as a_min, avg(max) as a_max
 	FROM	items i
 	JOIN	hist h
 	ON		(i.ROWID=h.id)
 	WHERE	1=1
 	AND		h.ts > DATE('now', ?)
 	AND		NOT i.name LIKE '%set'
-	GROUP BY	i.name
-) x
-WHERE	1=1
+	GROUP BY	i.ROWID, i.name
+) x"""
+    if search_tags:
+        query_tags = """
+JOIN    (
+    SELECT  ia.item_id
+    FROM    items_attrs ia
+    JOIN    tags t
+    ON (ia.tag_id=t.rowid)
+    WHERE   1=1
+    AND     LOWER(t.name) IN ("""
+        query_tags += ', '.join(["LOWER('" + x + "')" for x in search_tags])
+        query_tags += """)
+    GROUP BY ia.item_id"""
+        query_tags += """
+    HAVING COUNT(0)>=""" + str(len(search_tags))
+        query_tags += """
+) t_ ON (x.rowid=t_.item_id)
+"""
+        query += query_tags
+    query += """WHERE	1=1
 AND		x.a_vol >= ?
 AND		x.a_min >= ?
 AND(
@@ -498,6 +515,7 @@ class TreeMapWin(Frame):
         super().__init__(master)
         self.graph = None
         self.canvas = None
+        self.tags=[]
         self.reset_data()
         self.create_widgets()
 
@@ -650,7 +668,6 @@ def main():
         elif o in ("-e", "--extract"):
             exec_mode = 'e'
         elif o in ("--tags"):
-            exec_mode = 'e'
             tags = a.split(",")
         elif o in ("--show-tags"):
             exec_mode = 't'
@@ -694,7 +711,7 @@ Usage: (options) item1, item2, ...
 
 --tags t1,...   Specify which tags to be extracted; tags are dynamic; to show
                 what tags are available, please run with '--show-tags'
-                Setting this option implies options '-e'
+                Setting this option doesn't imply not '-e' nor '-x'
 
 --show-tags     Shows available tags and quits
 
@@ -769,7 +786,7 @@ Usage: (options) item1, item2, ...
         for i in l_items.keys():
             print(i)
     elif exec_mode == 'm':
-        rv = do_summary(n_days=s_n_days, min_volume=s_min_volume, min_price=s_min_price)
+        rv = do_summary(n_days=s_n_days, min_volume=s_min_volume, min_price=s_min_price, search_tags=tags)
         print("name,avg min price,avg max price,avg volume")
         for v in rv:
             print(v[0], v[1], v[2], v[3], sep=',')
