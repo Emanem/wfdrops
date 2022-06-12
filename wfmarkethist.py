@@ -511,12 +511,39 @@ def treemap_draw(tm, ax):
         cy = ry + r.get_height()/2.0
         ax.annotate(el['id'], (cx, cy), ha='center', va='center')
 
+class TagsPicker(Frame):
+    def __init__(self, master, treemap):
+        super().__init__(master)
+        self.tags = do_extract_tags()
+        self.tm = treemap
+        self.create_widgets()
+
+    def on_apply(self):
+        self.tm.tags = [self.tags[x] for x in self.lb.curselection()]
+        self.tm.search_changed()
+        self.master.destroy()
+
+    def create_widgets(self):
+        self.ysb = Scrollbar(self)
+        self.ysb.pack(side = RIGHT, fill = Y)
+        #
+        self.lb = Listbox(self, selectmode="multiple", yscrollcommand = self.ysb.set)
+        self.lb.pack(padx = 10, pady = 10, expand = YES, fill = "both")
+        for i in range(len(self.tags)):
+            self.lb.insert(END, self.tags[i])
+            if self.tags[i] in self.tm.tags:
+                self.lb.selection_set(i)
+        self.ysb.config(command = self.lb.yview)
+        #
+        self.btn_apply = Button(self, text="Apply", command=self.on_apply)
+        self.btn_apply.pack()
+
 class TreeMapWin(Frame):
     def __init__(self, master=None):
         super().__init__(master)
         self.graph = None
         self.canvas = None
-        self.tags=[]
+        self.tags = []
         self.reset_data()
         self.create_widgets()
 
@@ -524,15 +551,20 @@ class TreeMapWin(Frame):
         # this should be in the form of [{'id':'val1', 'value':1.0}, {'id':'val2', 'value':0.5}, {'id':'val3', 'value':0.4}]
         self.my_tm_data = []
 
+    def btn_tags(self):
+        root = Toplevel()
+        tp = TagsPicker(root, self)
+        tp.pack()
+
     def search_changed(self, *args):
         v = self.search_val.get()
-        if len(v) <= 0:
+        if len(v) <= 0 and not self.tags:
             self.other_items_val.set("")
             self.reset_data()
             self.update_graph()
             return None
         items = [x for x in v.split(',') if len(x) > 0]
-        ev = do_summary(min_volume=10, min_price=0, search_nm=items)
+        ev = do_summary(min_volume=10, min_price=0, search_nm=items, search_tags=self.tags)
         # get the first item in alphabetical order
         ev.sort()
         if not ev:
@@ -569,11 +601,14 @@ class TreeMapWin(Frame):
         self.canvas.get_tk_widget().place(x=10, y=self.graph_start_y)
 
     def do_resize(self, w, h):
-        oc_w = w - self.other_items.winfo_x() - self.vol_w_cb.winfo_width() - 20
+        oc_w = w - self.other_items.winfo_x() - self.vol_w_cb.winfo_width() - 30 - self.btn_tags.winfo_width()
         self.other_items.place(width=oc_w)
         # volume w. checkbox on the right hand side
-        vw_x = w - 10 - self.vol_w_cb.winfo_width()
+        vw_x = w - 10 - self.vol_w_cb.winfo_width() - 10 - self.btn_tags.winfo_width()
         self.vol_w_cb.place(x=vw_x)
+        # tag button on the rightmost side
+        tagb_x = w - 10 - self.btn_tags.winfo_width()
+        self.btn_tags.place(x=tagb_x)
         # update graph
         self.update_graph(w, h)
         self.config(width=w, height=h)
@@ -597,6 +632,9 @@ class TreeMapWin(Frame):
         self.vol_w_check = IntVar()
         self.vol_w_cb = Checkbutton(self, text="Volume w.", var=self.vol_w_check, command=self.search_changed)
         self.vol_w_cb.place(y=y_plc, height=24)
+        # button to display pop-up to set tags
+        self.btn_tags = Button(self, text="Select tags", command=self.btn_tags)
+        self.btn_tags.place(y=y_plc, height=24)
         y_plc += 24+10
         self.graph_start_y = y_plc
 
