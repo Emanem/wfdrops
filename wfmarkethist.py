@@ -15,6 +15,8 @@ from matplotlib.figure import Figure
 import matplotlib.dates as mdates
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.patches import Rectangle
+from matplotlib import cm
+from matplotlib import colors
 import random
 import math
 
@@ -466,7 +468,7 @@ def treemap_plot(values, tl = {'x':0.0, 'y':0.0}, br = {'x':1.0, 'y':1.0}, split
     if 0 == len(values):
         return []
     if 1 == len(values):
-        return [{'id':values[0]['id'], 'tl':tl, 'br':br}]
+        return [{'id':values[0]['id'], 'tl':tl, 'br':br, 'value':values[0]['value']}]
     else:
         # recursive step, splitting the list in 2
         split_s = len(values) // 2
@@ -497,14 +499,16 @@ def treemap_plot(values, tl = {'x':0.0, 'y':0.0}, br = {'x':1.0, 'y':1.0}, split
 
 # draw a treemap (tm) obtained via treemap_plot and an axis (ax) via
 # matplotlib figure <Figure>.add_subplot(...)
-def treemap_draw(tm, ax):
+def treemap_draw(tm, ax, *, color_fn=None):
     #draw a fake line, fully transparent
     ax.plot([0, 1], [0, 1], color=[1, 1, 1, 0])
     ax.set_axis_off()
     # for consistent colours
-    random.seed(a="123")
+    if not color_fn:
+        random.seed(a="123")
     for el in tm:
-        r = Rectangle((el['tl']['x'], el['tl']['y']), el['br']['x']-el['tl']['x'], el['br']['y']-el['tl']['y'], facecolor=[random.random(), random.random(), random.random()])
+        r_color = (random.random(), random.random(), random.random()) if not color_fn else color_fn(el['value'])
+        r = Rectangle((el['tl']['x'], el['tl']['y']), el['br']['x']-el['tl']['x'], el['br']['y']-el['tl']['y'], facecolor=r_color)
         ax.add_patch(r)
         rx, ry = r.get_xy()
         cx = rx + r.get_width()/2.0
@@ -517,6 +521,7 @@ class TagsPicker(Frame):
         self.tags = do_extract_tags()
         self.tm = treemap
         self.create_widgets()
+        master.title("Select Tags")
         self.pack(expand=Y, fill=Y)
 
     def on_apply(self):
@@ -545,8 +550,19 @@ class TreeMapWin(Frame):
         self.graph = None
         self.canvas = None
         self.tags = []
+        self.min_value = 0.0
+        self.max_value = 1.0
+        self.min_color = (0.5, 0.5, 1.0)
+        self.max_color = (1.0, 1.0, 0.5)
         self.reset_data()
         self.create_widgets()
+
+    def get_color(self, cur_value):
+        sf = 1.0 - (self.max_value - cur_value)/(self.max_value - self.min_value)
+        r_sf = []
+        for i in range(3):
+            r_sf.append(self.min_color[i] + (self.max_color[i] - self.min_color[i])*sf)
+        return (r_sf[0], r_sf[1], r_sf[2])
 
     def reset_data(self):
         # this should be in the form of [{'id':'val1', 'value':1.0}, {'id':'val2', 'value':0.5}, {'id':'val3', 'value':0.4}]
@@ -575,7 +591,7 @@ class TreeMapWin(Frame):
         self.other_items_val.set(', '.join([x[0] for x in ev])[:2048])
         self.reset_data()
         for e in ev:
-            self.my_tm_data.append({'id':e[0], 'value':(e[1] if self.vol_w_check.get() == 0 else e[1]*math.sqrt(e[3]))})
+            self.my_tm_data.append({'id':e[0], 'value':(e[1] if self.vol_check.get() == 0 else e[3])})
         self.update_graph()
 
     def update_graph(self, w=0, h=0):
@@ -593,9 +609,15 @@ class TreeMapWin(Frame):
             self.graph.set_figheight(g_h/dpi)
         if self.my_tm_data:
             ax = self.graph.add_subplot(111)
-            treemap_draw(treemap_plot(self.my_tm_data), ax)
+            my_vals = [x['value'] for x in self.my_tm_data]
+            self.min_value = min(my_vals)
+            self.max_value = max(my_vals)
+            treemap_draw(treemap_plot(self.my_tm_data), ax, color_fn=self.get_color)
             if self.tags:
                 ax.set_title("Tags: " + ', '.join(self.tags))
+            colmap = cm.ScalarMappable(cmap=colors.LinearSegmentedColormap.from_list("", [self.min_color, self.max_color]))
+            colmap.set_clim(vmin=self.min_value, vmax=self.max_value)
+            self.graph.colorbar(colmap, orientation='vertical', fraction=0.05, pad=0.01)
         if self.canvas is None:
             self.canvas = FigureCanvasTkAgg(self.graph, master=self)
         self.canvas.draw()
@@ -603,11 +625,11 @@ class TreeMapWin(Frame):
         self.canvas.get_tk_widget().place(x=10, y=self.graph_start_y)
 
     def do_resize(self, w, h):
-        oc_w = w - self.other_items.winfo_x() - self.vol_w_cb.winfo_width() - 30 - self.btn_tags.winfo_width()
+        oc_w = w - self.other_items.winfo_x() - self.vol_cb.winfo_width() - 30 - self.btn_tags.winfo_width()
         self.other_items.place(width=oc_w)
         # volume w. checkbox on the right hand side
-        vw_x = w - 10 - self.vol_w_cb.winfo_width() - 10 - self.btn_tags.winfo_width()
-        self.vol_w_cb.place(x=vw_x)
+        vw_x = w - 10 - self.vol_cb.winfo_width() - 10 - self.btn_tags.winfo_width()
+        self.vol_cb.place(x=vw_x)
         # tag button on the rightmost side
         tagb_x = w - 10 - self.btn_tags.winfo_width()
         self.btn_tags.place(x=tagb_x)
@@ -631,9 +653,9 @@ class TreeMapWin(Frame):
         self.other_items = Label(self, textvariable=self.other_items_val, anchor=W)
         self.other_items.place(x=138+128+10, y=y_plc, height=24)
         # values for the volume weight in the results
-        self.vol_w_check = IntVar()
-        self.vol_w_cb = Checkbutton(self, text="Volume w.", var=self.vol_w_check, command=self.search_changed)
-        self.vol_w_cb.place(y=y_plc, height=24)
+        self.vol_check = IntVar()
+        self.vol_cb = Checkbutton(self, text="Volume", var=self.vol_check, command=self.search_changed)
+        self.vol_cb.place(y=y_plc, height=24)
         # button to display pop-up to set tags
         self.btn_tags = Button(self, text="Select tags", command=self.btn_tags)
         self.btn_tags.place(y=y_plc, height=24)
