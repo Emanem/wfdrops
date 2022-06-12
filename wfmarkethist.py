@@ -209,7 +209,10 @@ JOIN    (
         query_tags += ', '.join(["LOWER('" + x + "')" for x in tags])
         query_tags += """
     )
-    GROUP BY ia.item_id
+    GROUP BY ia.item_id"""
+        query_tags += """
+    HAVING COUNT(0)>=""" + str(len(tags))
+        query_tags += """
 ) t_ ON (i.rowid=t_.item_id)
 """
         query += query_tags
@@ -228,7 +231,6 @@ AND     (
         items_q = "\tOR 1=1\n"
     query += items_q
     query += ")"
-    print(query)
     db = sqlite3.connect(G_DB_NAME)
     db_setup(db)
     cur = db.cursor()
