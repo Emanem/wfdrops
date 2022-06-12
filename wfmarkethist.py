@@ -205,15 +205,15 @@ JOIN    (
     JOIN    tags t
     ON (ia.tag_id=t.rowid)
     WHERE   1=1
-    AND     t.name IN ("""
+    AND     LOWER(t.name) IN ("""
+        query_tags += ', '.join(["LOWER('" + x + "')" for x in tags])
         query_tags += """
     )
     GROUP BY ia.item_id
 ) t_ ON (i.rowid=t_.item_id)
 """
         query += query_tags
-    query += """
-WHERE   1=1
+    query += """WHERE   1=1
 AND     (
         1=0
 """
@@ -223,8 +223,12 @@ AND     (
             n_v = re.split(r'\s+', n)
             n = '%'.join(n_v)
         items_q += "\tOR i.name LIKE '%" + n + "%'\n"
+    # if we have tags do select even if search_nm is empty
+    if tags and not search_nm:
+        items_q = "\tOR 1=1\n"
     query += items_q
     query += ")"
+    print(query)
     db = sqlite3.connect(G_DB_NAME)
     db_setup(db)
     cur = db.cursor()
@@ -239,6 +243,17 @@ AND     (
             rv[cd][ci] = {}
         for i in range(len(e_values)):
             rv[cd][ci][e_values[i]] = v[2+i]
+    db.close()
+    return rv
+
+def do_extract_tags():
+    db = sqlite3.connect(G_DB_NAME)
+    db_setup(db)
+    cur = db.cursor()
+    ri = cur.execute("SELECT name FROM " + G_DB_TAGS_NAME + " GROUP BY name")
+    rv = []
+    for v in ri:
+        rv.append(v[0])
     db.close()
     return rv
 
@@ -605,7 +620,7 @@ def display_graphs():
 
 def main():
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "gueshx", ["force-tags", "update-detail", "update-all", "graphs", "update", "extract", "summary", "summary-days=", "summary-any", "search", "help", "values="])
+        opts, args = getopt.getopt(sys.argv[1:], "gueshx", ["show-tags", "tags=", "force-tags", "update-detail", "update-all", "graphs", "update", "extract", "summary", "summary-days=", "summary-any", "search", "help", "values="])
     except getopt.GetoptError as err:
         print(err)
         sys.exit(-1)
@@ -617,6 +632,7 @@ def main():
     update_all = False
     update_detail = False
     force_tags = False
+    tags = []
     for o, a in opts:
         if o in ("-g", "--graphs"):
             exec_mode = 'g'
@@ -631,6 +647,11 @@ def main():
             force_tags = True
         elif o in ("-e", "--extract"):
             exec_mode = 'e'
+        elif o in ("--tags"):
+            exec_mode = 'e'
+            tags = a.split(",")
+        elif o in ("--show-tags"):
+            exec_mode = 't'
         elif o in ("-s", "--search"):
             exec_mode = 's'
         elif o in ("-h", "--help"):
@@ -668,6 +689,12 @@ Usage: (options) item1, item2, ...
                 - median
                 - m_avg
                 Specifying any value using this option implies option '-e'
+
+--tags t1,...   Specify which tags to be extracted; tags are dynamic; to show
+                what tags are available, please run with '--show-tags'
+                Setting this option implies options '-e'
+
+--show-tags     Shows available tags and quits
 
 -s, --search    Search remote warframe market for given items
 
@@ -732,7 +759,7 @@ Usage: (options) item1, item2, ...
         for i in dist:
             print(dist[i], "->", i)
     elif exec_mode == 'e':
-        ev = do_extract(args, extract_values)
+        ev = do_extract(args, extract_values, tags)
         do_extract_printout(ev, extract_values)
     elif exec_mode == 's':
         l_items = get_items_list(args)
@@ -744,6 +771,11 @@ Usage: (options) item1, item2, ...
         print("name,avg min price,avg max price,avg volume")
         for v in rv:
             print(v[0], v[1], v[2], v[3], sep=',')
+    elif exec_mode == 't':
+        ev = do_extract_tags()
+        print("\tTags:")
+        for t in ev:
+            print(t)
 
 if __name__ == "__main__":
     main()
