@@ -517,6 +517,7 @@ class TagsPicker(Frame):
         self.tags = do_extract_tags()
         self.tm = treemap
         self.create_widgets()
+        self.pack(expand=Y, fill=Y)
 
     def on_apply(self):
         self.tm.tags = [self.tags[x] for x in self.lb.curselection()]
@@ -554,7 +555,6 @@ class TreeMapWin(Frame):
     def btn_tags(self):
         root = Toplevel()
         tp = TagsPicker(root, self)
-        tp.pack()
 
     def search_changed(self, *args):
         v = self.search_val.get()
@@ -594,6 +594,8 @@ class TreeMapWin(Frame):
         if self.my_tm_data:
             ax = self.graph.add_subplot(111)
             treemap_draw(treemap_plot(self.my_tm_data), ax)
+            if self.tags:
+                ax.set_title("Tags: " + ', '.join(self.tags))
         if self.canvas is None:
             self.canvas = FigureCanvasTkAgg(self.graph, master=self)
         self.canvas.draw()
