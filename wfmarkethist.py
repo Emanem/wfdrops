@@ -667,12 +667,17 @@ class MainWin(Notebook):
         self.master.title("WF Market Hist")
         self.master.myId = 1
         self.master.bind("<Configure>", self.on_resize)
+        self.master.bind_all('<KeyPress>', self.on_key_press)
         self.my_w = 0
         self.my_h = 0
         self.hist_frame = None
         self.treemap_frame = None
         self.create_widgets()
         self.pack()
+
+    def on_key_press(self, event):
+        if event.keysym == 'Escape':
+            self.master.destroy()
 
     def on_resize(self, event):
         is_main_window = hasattr(event.widget, 'myId') and (event.widget.myId == 1)
