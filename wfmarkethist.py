@@ -18,7 +18,6 @@ from matplotlib.patches import Rectangle
 from matplotlib import cm
 from matplotlib import colors
 import random
-import math
 
 G_DB_NAME = "wf_mkt_hist.db"
 G_DB_ITEMS_NAME = "items"
@@ -617,7 +616,7 @@ class TreeMapWin(Frame):
                 ax.set_title("Tags: " + ', '.join(self.tags))
             colmap = cm.ScalarMappable(cmap=colors.LinearSegmentedColormap.from_list("", [self.min_color, self.max_color]))
             colmap.set_clim(vmin=self.min_value, vmax=self.max_value)
-            self.graph.colorbar(colmap, orientation='vertical', fraction=0.05, pad=0.01)
+            self.graph.colorbar(colmap, orientation='vertical', fraction=0.02, pad=0, aspect=60)
         if self.canvas is None:
             self.canvas = FigureCanvasTkAgg(self.graph, master=self)
         self.canvas.draw()
