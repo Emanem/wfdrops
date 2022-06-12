@@ -185,7 +185,7 @@ def get_items_list(search_nm, get_all=False):
                 rv[k['item_name']] = k['url_name']
     return rv
 
-def do_extract(search_nm, e_values, tags=[], wildcard_ws=False):
+def do_extract(search_nm, e_values, *, tags=[], wildcard_ws=False):
     query = """
 SELECT  i.name as name, h.ts as ts
 """
@@ -294,7 +294,8 @@ JOIN    (
 ) t_ ON (x.rowid=t_.item_id)
 """
         query += query_tags
-    query += """WHERE	1=1
+    query += """
+WHERE	1=1
 AND		x.a_vol >= ?
 AND		x.a_min >= ?
 AND(
@@ -370,7 +371,7 @@ class HistWin(Frame):
             self.reset_data()
             self.update_graph()
             return None
-        ev = do_extract([v], ['volume', 'min', 'avg', 'max'], True)
+        ev = do_extract([v], ['volume', 'min', 'avg', 'max'], wildcard_ws=True)
         # get the first item in alphabetical order
         all_items = {}
         for k, v in ev.items():
