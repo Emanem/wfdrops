@@ -557,6 +557,8 @@ class TreeMapWin(Frame):
         self.create_widgets()
 
     def get_color(self, cur_value):
+        if (self.max_value - self.min_value) == 0.0:
+            return self.max_color
         sf = 1.0 - (self.max_value - cur_value)/(self.max_value - self.min_value)
         r_sf = []
         for i in range(3):
