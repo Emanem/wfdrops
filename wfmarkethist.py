@@ -581,7 +581,7 @@ class TreeMapWin(Frame):
             self.update_graph()
             return None
         items = [x for x in v.split(',') if len(x) > 0]
-        ev = do_summary(min_volume=10, min_price=0, search_nm=items, search_tags=self.tags)
+        ev = do_summary(min_volume=0, min_price=0, search_nm=items, search_tags=self.tags)
         # get the first item in alphabetical order
         ev.sort()
         if not ev:
