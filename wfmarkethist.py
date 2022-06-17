@@ -528,20 +528,29 @@ class TagsPicker(Frame):
         self.tm.search_changed()
         self.master.destroy()
 
+    def on_cancel(self):
+        self.master.destroy()
+
     def create_widgets(self):
-        self.ysb = Scrollbar(self)
+        self.sel_fr = Frame(self)
+        self.sel_fr.pack(padx = 10, pady = 10, expand = YES, fill = "both")
+        self.ysb = Scrollbar(self.sel_fr)
         self.ysb.pack(side = RIGHT, fill = Y)
         #
-        self.lb = Listbox(self, selectmode="multiple", yscrollcommand = self.ysb.set)
-        self.lb.pack(padx = 10, pady = 10, expand = YES, fill = "both")
+        self.lb = Listbox(self.sel_fr, selectmode="multiple", yscrollcommand = self.ysb.set)
+        self.lb.pack(expand = YES, fill = "both")
         for i in range(len(self.tags)):
             self.lb.insert(END, self.tags[i])
             if self.tags[i] in self.tm.tags:
                 self.lb.selection_set(i)
         self.ysb.config(command = self.lb.yview)
         #
-        self.btn_apply = Button(self, text="Apply", command=self.on_apply)
-        self.btn_apply.pack()
+        self.sel_fr_b = Frame(self)
+        self.sel_fr_b.pack(padx = 10, pady = 10, fill = "both")
+        self.btn_apply = Button(self.sel_fr_b, text="Apply", command=self.on_apply)
+        self.btn_apply.pack(side = LEFT)
+        self.btn_cancel = Button(self.sel_fr_b, text="Cancel", command=self.on_cancel)
+        self.btn_cancel.pack(side = RIGHT)
 
 class TreeMapWin(Frame):
     def __init__(self, master=None):
