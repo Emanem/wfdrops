@@ -257,7 +257,8 @@ def do_extract_tags():
     for v in ri:
         rv.append(v[0])
     db.close()
-    return rv
+    filters = ['---']
+    return [x for x in rv if (x not in filters)]
 
 def do_summary(n_days=10, min_volume=24, min_price=25, search_nm=[], search_tags=[]):
     items_q = ""
