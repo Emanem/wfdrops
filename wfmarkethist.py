@@ -164,7 +164,11 @@ def store_hist_data(item_names, force_metadata=False):
     # perform insertion of all data
     rv = db_insert_raw_data(db, all_items)
     db.close()
-    return rv
+    # prepare return query stats
+    rv_q = {}
+    for nm in all_items.keys():
+        rv_q[nm] = len(all_items[nm][0])
+    return (rv, rv_q)
 
 def get_items_list(search_nm, get_all=False):
     str_url = '/v1/items'
@@ -842,12 +846,20 @@ Usage: (options) item1, item2, ...
         print("\tAdding/Updating:")
         for i in items.keys():
             print(i)
-        rv = store_hist_data(items, force_tags)
+        rv, rv_q = store_hist_data(items, force_tags)
         if update_detail:
             print("\tEntries added:")
             for i in rv:
                 if rv[i] > 0:
                     print(i, rv[i])
+        print("\tSummary count hist:")
+        dist = {}
+        for k, v in rv_q.items():
+            if v not in dist:
+                dist[v] = 0
+            dist[v] = dist[v] + 1
+        for i in dist:
+            print(dist[i], "->", i)
         print("\tSummary count added:")
         dist = {}
         for k, v in rv.items():
