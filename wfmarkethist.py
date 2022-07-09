@@ -858,16 +858,16 @@ Usage: (options) item1, item2, ...
             if v not in dist:
                 dist[v] = 0
             dist[v] = dist[v] + 1
-        for i in dist:
-            print(dist[i], "->", i)
+        for i in sorted(dist):
+            print(i, "->", dist[i])
         print("\tSummary count added:")
         dist = {}
         for k, v in rv.items():
             if v not in dist:
                 dist[v] = 0
             dist[v] = dist[v] + 1
-        for i in dist:
-            print(dist[i], "->", i)
+        for i in sorted(dist):
+            print(i, "->", dist[i])
     elif exec_mode == 'e':
         ev = do_extract(args, extract_values, tags)
         do_extract_printout(ev, extract_values)
