@@ -98,13 +98,20 @@ def parse_hist_stats(data):
             hist_data = json.loads(x.text)
             break
     rv = []
+    subytpes_r = [None, 'intact', 'basic', 'small']
+    subtype_found = {}
     if hist_data is not None:
         for x in hist_data["payload"]["statistics_closed"]["90days"]:
             # skip fully upgraded mods
             if x.get('mod_rank', 0) != 0:
                 continue
+            # skip non 'intact' relics or fishes
+            # use the list for other types
+            if x.get('subtype', None) not in subytpes_r:
+                subtype_found[x.get('subtype', None)] = 0
+                continue
             rv.append((datetime.datetime.fromisoformat(x['datetime']), int(x['volume']), int(x['min_price']), int(x['max_price']), int(x['open_price']), int(x['closed_price']), float(x['avg_price']), float(x['wa_price']), float(x['median']), float(x.get('moving_avg', 0.0))))
-    return rv
+    return (rv, subtype_found)
 
 def parse_attrs(data):
     jdata = json.loads(data)
@@ -127,7 +134,8 @@ def get_hist_stats(item_name, https_cp, https_cp_api, query_metadata):
         str_url = '/v1/items/' + item_name
         data_attrs = get_wfm_webapi(str_url, https_cp_api)
         tags = parse_attrs(data_attrs)
-    return (parse_hist_stats(data), tags)
+    phs = parse_hist_stats(data)
+    return (phs[0], tags, phs[1])
 
 def store_hist_data(item_names, force_metadata=False):
     print("\tFetching:")
@@ -164,11 +172,15 @@ def store_hist_data(item_names, force_metadata=False):
     # perform insertion of all data
     rv = db_insert_raw_data(db, all_items)
     db.close()
-    # prepare return query stats
+    # prepare return query stats and
+    # warning items
     rv_q = {}
+    rv_subtypes = {}
     for nm in all_items.keys():
         rv_q[nm] = len(all_items[nm][0])
-    return (rv, rv_q)
+        if bool(all_items[nm][2]):
+            rv_subtypes[nm] = all_items[nm][2]
+    return (rv, rv_q, rv_subtypes)
 
 def get_items_list(search_nm, get_all=False):
     str_url = '/v1/items'
@@ -846,7 +858,7 @@ Usage: (options) item1, item2, ...
         print("\tAdding/Updating:")
         for i in items.keys():
             print(i)
-        rv, rv_q = store_hist_data(items, force_tags)
+        rv, rv_q, rv_subt = store_hist_data(items, force_tags)
         if update_detail:
             print("\tEntries added:")
             for i in rv:
@@ -854,10 +866,15 @@ Usage: (options) item1, item2, ...
                     print(i, rv[i])
         print("\tSummary count hist:")
         dist = {}
+        rv_w = {}
         for k, v in rv_q.items():
             if v not in dist:
                 dist[v] = 0
             dist[v] = dist[v] + 1
+            # we ask for 90 days, if it's
+            # more than that, print a warning
+            if (v > 89):
+                rv_w[k] = v
         for i in sorted(dist):
             print(i, "->", dist[i])
         print("\tSummary count added:")
@@ -868,6 +885,16 @@ Usage: (options) item1, item2, ...
             dist[v] = dist[v] + 1
         for i in sorted(dist):
             print(i, "->", dist[i])
+        # check if we have to print any warning
+        # and skipped subtypes
+        if bool(rv_w):
+            print("\tWarnings:")
+            for i in sorted(rv_w):
+                print(i, "->", rv_w[i])
+        #if bool(rv_subt):
+        #    print("\tSubtypes skipped:")
+        #    for i in sorted(rv_subt):
+        #        print(i, "->", list(rv_subt[i].keys()))
     elif exec_mode == 'e':
         ev = do_extract(args, extract_values, tags)
         do_extract_printout(ev, extract_values)
