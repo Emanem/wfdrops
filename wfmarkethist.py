@@ -891,10 +891,17 @@ Usage: (options) item1, item2, ...
             print("\tWarnings:")
             for i in sorted(rv_w):
                 print(i, "->", rv_w[i])
-        #if bool(rv_subt):
-        #    print("\tSubtypes skipped:")
-        #    for i in sorted(rv_subt):
-        #        print(i, "->", list(rv_subt[i].keys()))
+        if bool(rv_subt):
+            rv_stypes = {}
+            for k, v in rv_subt.items():
+                for s in v:
+                    if s not in rv_stypes:
+                        rv_stypes[s] = []
+                    rv_stypes[s].append(k)
+            print("\tSubtypes skipped:")
+            for i in sorted(rv_stypes):
+                rv_stypes[i].sort()
+                print(i, "->", rv_stypes[i])
     elif exec_mode == 'e':
         ev = do_extract(args, extract_values, tags)
         do_extract_printout(ev, extract_values)
