@@ -18,6 +18,7 @@ from matplotlib.patches import Rectangle
 from matplotlib import cm
 from matplotlib import colors
 import random
+import threading
 
 G_DB_NAME = "wf_mkt_hist.db"
 G_DB_ITEMS_NAME = "items"
@@ -700,8 +701,16 @@ class MainWin(Notebook):
         self.my_h = 0
         self.hist_frame = None
         self.treemap_frame = None
+        self.resize_scheduled = False
         self.create_widgets()
         self.pack()
+
+    def do_resize(self):
+        self.resize_scheduled = False
+        if self.hist_frame:
+            self.hist_frame.do_resize(self.my_w, self.my_h)
+        if self.treemap_frame:
+            self.treemap_frame.do_resize(self.my_w, self.my_h)
 
     def on_key_press(self, event):
         if event.keysym == 'Escape':
@@ -710,12 +719,13 @@ class MainWin(Notebook):
     def on_resize(self, event):
         is_main_window = hasattr(event.widget, 'myId') and (event.widget.myId == 1)
         main_changed_size = is_main_window and ((event.width != self.my_w) or (event.height != self.my_h))
-        if is_main_window:
-            if main_changed_size:
-                if self.hist_frame:
-                    self.hist_frame.do_resize(event.width, event.height)
-                if self.treemap_frame:
-                    self.treemap_frame.do_resize(event.width, event.height)
+        if main_changed_size:
+            # we user 'after' to avoid too many 'resize'
+            # events and use too many CPU cycles
+            # the delay is going to be 250 ms
+            if not self.resize_scheduled:
+                self.resize_scheduled = True
+                self.after(250, self.do_resize)
             self.my_w = event.width
             self.my_h = event.height
 
