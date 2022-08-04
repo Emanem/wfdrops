@@ -18,7 +18,6 @@ from matplotlib.patches import Rectangle
 from matplotlib import cm
 from matplotlib import colors
 import random
-import threading
 
 G_DB_NAME = "wf_mkt_hist.db"
 G_DB_ITEMS_NAME = "items"
