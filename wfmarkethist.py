@@ -431,10 +431,7 @@ class HistWin(Frame):
         g_h = (h-self.graph_start_y-35)
         if not self.graph:
             self.graph = Figure(figsize=(g_w/dpi, g_h/dpi), dpi=100)
-        else:
-            self.graph.clear()
-            self.graph.set_figwidth(g_w/dpi)
-            self.graph.set_figheight(g_h/dpi)
+        self.graph.clear()
         if self.my_x_data:
             sp = self.graph.add_subplot(111)
             sp.set_ylabel('Price', color="red")
@@ -452,12 +449,12 @@ class HistWin(Frame):
         if self.canvas is None:
             self.canvas = FigureCanvasTkAgg(self.graph, master=self)
         self.canvas.draw()
-        self.canvas.get_tk_widget().config(width=g_w, height=g_h)
-        self.canvas.get_tk_widget().place(x=10, y=self.graph_start_y)
+        self.canvas.get_tk_widget().place(x=10, y=self.graph_start_y, width=g_w, height=g_h)
 
     def do_resize(self, w, h):
         oc_w = w - self.other_items.winfo_x() - 20
         self.other_items.place(width=oc_w)
+        self.config(width=w, height=h)
         self.update_graph(w, h)
         self.config(width=w, height=h)
 
@@ -630,10 +627,7 @@ class TreeMapWin(Frame):
         g_h = (h-self.graph_start_y-35)
         if not self.graph:
             self.graph = Figure(figsize=(g_w/dpi, g_h/dpi), dpi=100)
-        else:
-            self.graph.clear()
-            self.graph.set_figwidth(g_w/dpi)
-            self.graph.set_figheight(g_h/dpi)
+        self.graph.clear()
         if self.my_tm_data:
             ax = self.graph.add_subplot(111)
             my_vals = [x['value'] for x in self.my_tm_data]
@@ -648,8 +642,7 @@ class TreeMapWin(Frame):
         if self.canvas is None:
             self.canvas = FigureCanvasTkAgg(self.graph, master=self)
         self.canvas.draw()
-        self.canvas.get_tk_widget().config(width=g_w, height=g_h)
-        self.canvas.get_tk_widget().place(x=10, y=self.graph_start_y)
+        self.canvas.get_tk_widget().place(x=10, y=self.graph_start_y, width=g_w, height=g_h)
 
     def do_resize(self, w, h):
         oc_w = w - self.other_items.winfo_x() - self.vol_cb.winfo_width() - 30 - self.btn_tags.winfo_width()
