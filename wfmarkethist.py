@@ -276,7 +276,7 @@ def do_extract_tags():
     filters = ['---']
     return [x for x in rv if (x not in filters)]
 
-def do_summary(n_days=10, min_volume=24, min_price=25, search_nm=[], search_tags=[]):
+def do_summary(n_days=10, min_volume=24, min_price=25, search_nm=[], search_tags=[], exclude_sets=True):
     items_q = ""
     for n in search_nm:
         n_v = re.split(r'\s+', n)
@@ -290,9 +290,11 @@ from (
 	JOIN	hist h
 	ON		(i.ROWID=h.id)
 	WHERE	1=1
-	AND		h.ts > DATE('now', ?)
-	AND		NOT i.name LIKE '%set'
-	GROUP BY	i.ROWID, i.name
+	AND		h.ts > DATE('now', ?)"""
+    if exclude_sets:
+        query += "    AND   NOT i.name LIKE '%set'"
+    query += """
+    GROUP BY	i.ROWID, i.name
 ) x"""
     if search_tags:
         query_tags = """
@@ -533,16 +535,20 @@ class TagsPicker(Frame):
         super().__init__(master)
         self.tags = do_extract_tags()
         self.tm = treemap
+        self.tm.btn_tags['state'] = DISABLED
         self.create_widgets()
+        self.master.protocol("WM_DELETE_WINDOW", self.on_cancel)
         master.title("Select Tags")
         self.pack(expand=Y, fill=Y)
 
     def on_apply(self):
         self.tm.tags = [self.tags[x] for x in self.lb.curselection()]
         self.tm.search_changed()
+        self.tm.btn_tags['state'] = NORMAL
         self.master.destroy()
 
     def on_cancel(self):
+        self.tm.btn_tags['state'] = NORMAL
         self.master.destroy()
 
     def create_widgets(self):
@@ -604,7 +610,7 @@ class TreeMapWin(Frame):
             self.update_graph()
             return None
         items = [x for x in v.split(',') if len(x) > 0]
-        ev = do_summary(min_volume=0, min_price=0, search_nm=items, search_tags=self.tags)
+        ev = do_summary(min_volume=0, min_price=0, search_nm=items, search_tags=self.tags, exclude_sets=False)
         # get the first item in alphabetical order
         ev.sort()
         if not ev:
