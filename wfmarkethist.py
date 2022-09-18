@@ -20,6 +20,7 @@ from matplotlib import colors
 import random
 
 G_DB_NAME = "wf_mkt_hist.db"
+G_DB_NAME_RO = "file:" + G_DB_NAME + "?mode=ro"
 G_DB_ITEMS_NAME = "items"
 G_DB_ITEMS_HIST = "hist"
 G_DB_TAGS_NAME = "tags"
@@ -247,7 +248,7 @@ AND     (
         items_q = "\tOR 1=1\n"
     query += items_q
     query += ")"
-    db = sqlite3.connect(G_DB_NAME)
+    db = sqlite3.connect(G_DB_NAME_RO, uri=True)
     db_setup(db)
     cur = db.cursor()
     ri = cur.execute(query)
@@ -265,7 +266,7 @@ AND     (
     return rv
 
 def do_extract_tags():
-    db = sqlite3.connect(G_DB_NAME)
+    db = sqlite3.connect(G_DB_NAME_RO, uri=True)
     db_setup(db)
     cur = db.cursor()
     ri = cur.execute("SELECT name FROM " + G_DB_TAGS_NAME + " GROUP BY name")
@@ -326,7 +327,7 @@ AND(
 ORDER BY	x.a_min DESC
 """
     interval_q = "-" + str(n_days) + " days"
-    db = sqlite3.connect(G_DB_NAME)
+    db = sqlite3.connect(G_DB_NAME_RO, uri=True)
     db_setup(db)
     cur = db.cursor()
     flag_search = 1 if len(search_nm) == 0 else 0
@@ -743,7 +744,7 @@ def display_graphs():
 
 def main():
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "gueshx", ["show-tags", "tags=", "force-tags", "update-detail", "update-all", "graphs", "update", "extract", "summary", "summary-days=", "summary-any", "search", "help", "values="])
+        opts, args = getopt.getopt(sys.argv[1:], "gueshx", ["show-tags", "tags=", "force-tags", "update-detail", "update-all", "graphs", "update", "extract", "summary", "summary-days=", "summary-any", "search", "help", "values=", "missing"])
     except getopt.GetoptError as err:
         print(err)
         sys.exit(-1)
@@ -835,6 +836,9 @@ Usage: (options) item1, item2, ...
                 price (24 and 25 respectively)
                 Specifying any value using this option implies option '-x'
 
+--missing       Prints the missing names from the market (i.e. names we have in
+                local DB but not anymore in the market)
+
 -h, --help      Displays this help and exit
             ''')
             sys.exit(0)
@@ -858,6 +862,8 @@ Usage: (options) item1, item2, ...
             exec_mode = 'm'
             s_min_volume = 0
             s_min_price = 0
+        elif o in ("--missing"):
+            exec_mode = 'i'
     # args should contain the list of items to extract/update
     if exec_mode == 'g':
         display_graphs()
@@ -928,6 +934,16 @@ Usage: (options) item1, item2, ...
         print("\tTags:")
         for t in ev:
             print(t)
+    elif exec_mode == 'i':
+        db = sqlite3.connect(G_DB_NAME_RO, uri=True)
+        db_setup(db)
+        lcl_nm = db_fetch_names(db, G_DB_ITEMS_NAME, [])
+        db.close()
+        mkt_nm = get_items_list(None, True)
+        print("\tMissing:")
+        for n in lcl_nm:
+            if n not in mkt_nm:
+                print(n)
 
 if __name__ == "__main__":
     main()
