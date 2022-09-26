@@ -439,6 +439,7 @@ class HistWin(Frame):
             sp = self.graph.add_subplot(111)
             sp.set_ylabel('Price', color="red")
             sp.set_title(self.my_item_data)
+            sp.axhline(y=self.my_y1_data['avg'][-1], color=[0.75, 0.5, 0.5], linestyle=':')
             sp.plot(self.my_x_data, self.my_y1_data['min'], color=[1, 0, 0])
             sp.plot(self.my_x_data, self.my_y1_data['avg'], color=[1, 0.5, 0.5])
             sp.plot(self.my_x_data, self.my_y1_data['max'], color=[1, 0.75, 0.75])
@@ -446,6 +447,7 @@ class HistWin(Frame):
             sp2.bar(self.my_x_data, self.my_y2_data, color=[0, 0, 1, 0.3])
             sp2.set_ylabel('Volume', color="blue")
             sp.set_xlim(min(self.my_x_data), max(self.my_x_data))
+            sp.set_ylim(ymin=0)
             for l in sp.get_xticklabels():
                 l.set_rotation(25)
                 l.set_horizontalalignment('right')
