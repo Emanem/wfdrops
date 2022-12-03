@@ -99,7 +99,7 @@ def parse_hist_stats(data):
             hist_data = json.loads(x.text)
             break
     rv = []
-    subytpes_r = [None, 'intact', 'basic', 'small']
+    subytpes_r = [None, 'intact', 'basic', 'small', 'revealed']
     subtype_found = {}
     if hist_data is not None:
         for x in hist_data["payload"]["statistics_closed"]["90days"]:
