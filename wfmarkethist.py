@@ -112,6 +112,12 @@ def parse_hist_stats(data):
                 subtype_found[x.get('subtype', None)] = 0
                 continue
             rv.append((datetime.datetime.fromisoformat(x['datetime']), int(x['volume']), int(x['min_price']), int(x['max_price']), int(x['open_price']), int(x['closed_price']), float(x['avg_price']), float(x['wa_price']), float(x['median']), float(x.get('moving_avg', 0.0))))
+    # consistency check
+    uniq_dates = {}
+    for x in rv:
+        uniq_dates[x[0]] = None
+    if len(uniq_dates) != len(rv):
+        raise ValueError('Current item may have multiple valid subptypes yielding to duplicate data')
     return (rv, subtype_found)
 
 def parse_attrs(data):
