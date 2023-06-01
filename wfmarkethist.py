@@ -283,7 +283,7 @@ def do_extract_tags():
     filters = ['---']
     return [x for x in rv if (x not in filters)]
 
-def do_summary(n_days=10, min_volume=24, min_price=25, search_nm=[], search_tags=[], exclude_sets=True):
+def do_summary(n_days=10, min_volume=24, min_price=25, search_nm=[], search_tags=[], tags_andor=True, exclude_sets=True):
     items_q = ""
     for n in search_nm:
         n_v = re.split(r'\s+', n)
@@ -304,6 +304,7 @@ from (
     GROUP BY	i.ROWID, i.name
 ) x"""
     if search_tags:
+        count_tags = str(len(search_tags)) if tags_andor else '1'
         query_tags = """
 JOIN    (
     SELECT  ia.item_id
@@ -316,7 +317,7 @@ JOIN    (
         query_tags += """)
     GROUP BY ia.item_id"""
         query_tags += """
-    HAVING COUNT(0)>=""" + str(len(search_tags))
+    HAVING COUNT(0)>=""" + count_tags
         query_tags += """
 ) t_ ON (x.rowid=t_.item_id)
 """
@@ -545,6 +546,8 @@ class TagsPicker(Frame):
         self.tags = do_extract_tags()
         self.tm = treemap
         self.tm.btn_tags['state'] = DISABLED
+        self.andor_v = IntVar()
+        self.andor_v.set(1 if self.tm.tags_andor else 2)
         self.create_widgets()
         self.master.protocol("WM_DELETE_WINDOW", self.on_cancel)
         master.title("Select Tags")
@@ -552,6 +555,7 @@ class TagsPicker(Frame):
 
     def on_apply(self):
         self.tm.tags = [self.tags[x] for x in self.lb.curselection()]
+        self.tm.tags_andor = self.andor_v.get() == 1
         self.tm.search_changed()
         self.tm.btn_tags['state'] = NORMAL
         self.master.destroy()
@@ -574,6 +578,10 @@ class TagsPicker(Frame):
                 self.lb.selection_set(i)
         self.ysb.config(command = self.lb.yview)
         #
+        self.sel_fr_andor = Frame(self)
+        self.sel_fr_andor.pack(padx = 10, pady = 10, fill = "both")
+        self.rdb_and = Radiobutton(self.sel_fr_andor, text="AND", padx = 20, variable=self.andor_v, value=1).pack(side = LEFT)
+        self.rdb_or = Radiobutton(self.sel_fr_andor, text="OR", padx = 20, variable=self.andor_v, value=2).pack(side = RIGHT)
         self.sel_fr_b = Frame(self)
         self.sel_fr_b.pack(padx = 10, pady = 10, fill = "both")
         self.btn_apply = Button(self.sel_fr_b, text="Apply", command=self.on_apply)
@@ -587,6 +595,7 @@ class TreeMapWin(Frame):
         self.graph = None
         self.canvas = None
         self.tags = []
+        self.tags_andor = True
         self.min_value = 0.0
         self.max_value = 1.0
         self.min_color = (0.5, 0.5, 1.0)
@@ -619,7 +628,7 @@ class TreeMapWin(Frame):
             self.update_graph()
             return None
         items = [x for x in v.split(',') if len(x) > 0]
-        ev = do_summary(min_volume=0, min_price=0, search_nm=items, search_tags=self.tags, exclude_sets=False)
+        ev = do_summary(min_volume=0, min_price=0, search_nm=items, search_tags=self.tags, tags_andor=self.tags_andor, exclude_sets=False)
         # get the first item in alphabetical order
         ev.sort()
         if not ev:
