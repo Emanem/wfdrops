@@ -28,6 +28,29 @@ G_DB_ITEMS_TAGS = "items_attrs"
 G_WFM_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36'
 G_SLEEP_THROTTLE = 0.5
 
+def uniform_str(s):
+    spl = s.split()
+    rv = []
+    for ts in spl:
+        lc = ts.lower()
+        rv.append(lc[0].upper() + lc[1:])
+    return ' '.join(rv)
+
+# utility function to make the DB names uniform
+def update_db_names(db):
+    cur = db.cursor()
+    q="select name, ROWID from " + G_DB_ITEMS_NAME
+    ri = cur.execute(q)
+    nm = {}
+    for i in ri:
+        print(i)
+        nm[i[0]] = i[1]
+    for k, v in nm.items():
+        q = "update " + G_DB_ITEMS_NAME + " set name=? where ROWID=?"
+        cur.execute(q, (uniform_str(k), v))
+    db.commit()
+    return None
+
 def db_setup(db):
     cur = db.cursor()
     cur.execute("CREATE TABLE IF NOT EXISTS " + G_DB_ITEMS_NAME + " (name text)")
@@ -125,7 +148,7 @@ def parse_attrs(data):
     rv = {}
     for x in jdata['payload']['item']['items_in_set']:
         for y in x['tags']:
-            rv[y] = 1
+            rv[y.lower()] = 1
     return list(rv.keys())
 
 def get_wfm_webapi(str_url, https_cp):
@@ -197,7 +220,7 @@ def get_items_list(search_nm, get_all=False):
     if get_all:
         rv = {}
         for k in jdata['payload']['items']:
-            rv[k['item_name']] = k['url_name']
+            rv[uniform_str(k['item_name'])] = k['url_name']
         return rv
     r_items = []
     for s in search_nm:
@@ -206,7 +229,7 @@ def get_items_list(search_nm, get_all=False):
     for k in jdata['payload']['items']:
         for r_i in r_items:
             if r_i.match(k['item_name']) is not None:
-                rv[k['item_name']] = k['url_name']
+                rv[uniform_str(k['item_name'])] = k['url_name']
     return rv
 
 def do_extract(search_nm, e_values, *, tags=[], wildcard_ws=False):
