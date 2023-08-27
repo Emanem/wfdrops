@@ -968,7 +968,7 @@ Usage: (options) item1, item2, ...
                 rv_stypes[i].sort()
                 print(i, "->", rv_stypes[i])
     elif exec_mode == 'e':
-        ev = do_extract(args, extract_values, tags)
+        ev = do_extract(args, extract_values, tags=tags, n_days=G_N_DAYS_HIST)
         do_extract_printout(ev, extract_values)
     elif exec_mode == 's':
         l_items = get_items_list(args)
