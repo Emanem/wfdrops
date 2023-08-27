@@ -789,7 +789,7 @@ def display_graphs():
 
 def main():
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "gueshx", ["show-tags", "tags=", "force-tags", "update-detail", "update-all", "graphs", "update", "extract", "summary", "summary-days=", "summary-any", "search", "help", "values=", "missing", "no-hist-limit"])
+        opts, args = getopt.getopt(sys.argv[1:], "gueshx", ["show-tags", "tags=", "force-tags", "update-detail", "update-all", "graphs", "update", "extract", "summary", "summary-days=", "summary-any", "search", "help", "values=", "missing", "no-hist-limit", "x-all"])
     except getopt.GetoptError as err:
         print(err)
         sys.exit(-1)
@@ -802,6 +802,7 @@ def main():
     update_detail = False
     force_tags = False
     tags = []
+    do_summary_sets = False
     for o, a in opts:
         if o in ("-g", "--graphs"):
             exec_mode = 'g'
@@ -878,6 +879,8 @@ Usage: (options) item1, item2, ...
                 By default only items whose average volume >= 24 and average
                 min price >= 25 will be reported
 
+--x-all         As per above '-x' but also includes 'sets'
+
 --summary-days  Specifies how many days of interval have to be chosen when
                 printing out the summary (default 10)
                 Specifying any value using this option implies option '-x'
@@ -901,8 +904,10 @@ Usage: (options) item1, item2, ...
                     print("Invalid value '" + s + "' specified in extraction")
                     sys.exit(-1)
             extract_values = s_e_values
-        elif o in ("-x", "--summary"):
+        elif o in ("-x", "--summary", "--x-all"):
             exec_mode = 'm'
+            if o == "--x-all":
+                do_summary_sets = True
         elif o in ("--summary-days"):
             exec_mode = 'm'
             s_n_days = int(a)
@@ -976,7 +981,7 @@ Usage: (options) item1, item2, ...
         for i in l_items.keys():
             print(i)
     elif exec_mode == 'm':
-        rv = do_summary(n_days=s_n_days, min_volume=s_min_volume, min_price=s_min_price, search_tags=tags)
+        rv = do_summary(n_days=s_n_days, min_volume=s_min_volume, min_price=s_min_price, search_tags=tags, exclude_sets=not do_summary_sets)
         print("name,avg min price,avg max price,avg volume")
         for v in rv:
             print(v[0], v[1], v[2], v[3], sep=',')
