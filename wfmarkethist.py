@@ -27,6 +27,7 @@ G_DB_TAGS_NAME = "tags"
 G_DB_ITEMS_TAGS = "items_attrs"
 G_WFM_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36'
 G_SLEEP_THROTTLE = 0.5
+G_N_DAYS_HIST = 365
 
 def uniform_str(s):
     spl = s.split()
@@ -232,7 +233,7 @@ def get_items_list(search_nm, get_all=False):
                 rv[uniform_str(k['item_name'])] = k['url_name']
     return rv
 
-def do_extract(search_nm, e_values, *, tags=[], wildcard_ws=False):
+def do_extract(search_nm, e_values, *, tags=[], wildcard_ws=False, n_days=G_N_DAYS_HIST):
     query = """
 SELECT  i.name as name, h.ts as ts
 """
@@ -277,10 +278,14 @@ AND     (
         items_q = "\tOR 1=1\n"
     query += items_q
     query += ")"
+    if n_days > 0:
+        query += """
+AND     h.ts > DATE('now', ?)"""
+    interval_q = "-" + str(n_days) + " days"
     db = sqlite3.connect(G_DB_NAME_RO, uri=True)
     db_setup(db)
     cur = db.cursor()
-    ri = cur.execute(query)
+    ri = cur.execute(query) if n_days <= 0 else cur.execute(query, (interval_q,))
     rv = {}
     for v in ri:
         cd = datetime.datetime.fromisoformat(v[1])
@@ -422,7 +427,7 @@ class HistWin(Frame):
             self.reset_data()
             self.update_graph()
             return None
-        ev = do_extract([v], ['volume', 'min', 'avg', 'max'], wildcard_ws=True)
+        ev = do_extract([v], ['volume', 'min', 'avg', 'max'], wildcard_ws=True, n_days=G_N_DAYS_HIST)
         # get the first item in alphabetical order
         all_items = {}
         for k, v in ev.items():
@@ -784,7 +789,7 @@ def display_graphs():
 
 def main():
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "gueshx", ["show-tags", "tags=", "force-tags", "update-detail", "update-all", "graphs", "update", "extract", "summary", "summary-days=", "summary-any", "search", "help", "values=", "missing"])
+        opts, args = getopt.getopt(sys.argv[1:], "gueshx", ["show-tags", "tags=", "force-tags", "update-detail", "update-all", "graphs", "update", "extract", "summary", "summary-days=", "summary-any", "search", "help", "values=", "missing", "no-hist-limit"])
     except getopt.GetoptError as err:
         print(err)
         sys.exit(-1)
@@ -800,6 +805,9 @@ def main():
     for o, a in opts:
         if o in ("-g", "--graphs"):
             exec_mode = 'g'
+        elif o in("--no-hist-limit"):
+            global G_N_DAYS_HIST
+            G_N_DAYS_HIST = 0
         elif o in ("-u", "--update"):
             exec_mode = 'u'
         elif o in ("--update-all"):
@@ -824,6 +832,9 @@ Usage: (options) item1, item2, ...
 
 -g, --graphs    Display a Tkinter UI with a search pane and graphs of
                 a given item, min/avg/max and the volume
+
+--no-hist-limit Removes the 1-year period limit when extracting historical
+                values from the DB
 
 -u, --update    Add/update the given items to the local SQLite database
                 This is the default operation mode
