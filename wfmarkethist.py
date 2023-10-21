@@ -154,6 +154,7 @@ def parse_attrs(data):
 
 def get_wfm_webapi(str_url, https_cp):
     f = https_cp.urlopen('GET', str_url, headers={'User-Agent': G_WFM_USER_AGENT})
+    f.read()
     return f.data.decode('utf-8')
 
 def get_hist_stats(item_name, https_cp, https_cp_api, query_metadata):
@@ -1002,4 +1003,9 @@ Usage: (options) item1, item2, ...
                 print(n)
 
 if __name__ == "__main__":
+    # create the HTTPS pool here
+    #https_cp = urllib3.HTTPSConnectionPool('warframe.market')
+    #https_cp_api = urllib3.HTTPSConnectionPool('api.warframe.market')
+    #r = get_hist_stats('mirage_prime_systems', https_cp, https_cp_api, True)
+    #print(r)
     main()
