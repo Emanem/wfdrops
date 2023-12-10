@@ -14,7 +14,7 @@ import os.path
 mission_r = re.compile(r'([:a-z ]+)/([a-z ]+) \(([a-z ]+)\)', re.IGNORECASE)
 rotation_r = re.compile(r'rotation ([ABC])', re.IGNORECASE)
 chance_r = re.compile(r'[a-z]+ \((\d+).(\d+)\%\)', re.IGNORECASE)
-drops_url_r = re.compile(r'^http(s|)\://.*\.html$', re.IGNORECASE)
+drops_url_r = re.compile(r'^http(s|)\://.*$', re.IGNORECASE)
 mods_drop_r = re.compile(r'mod drop chance\: (\d+).(\d+)\%', re.IGNORECASE)
 
 # local file name holding drops
@@ -310,7 +310,7 @@ def parse_local_data():
 
 def update_do_closew(d_file, w):
     if not drops_url_r.match(d_file):
-        messagebox.showerror(master=w, title="Error", message="Please spcify a valid URL for a drops html file\n(i.e. 'https://n8k6e2y6.ssl.hwcdn.net/repos/hnfvc0o3jnfvc873njb03enrf56.html')")
+        messagebox.showerror(master=w, title="Error", message="Please spcify a valid URL for a drops html file\n(i.e. 'https://www.warframe.com/droptables')")
         return None
     urllib.request.urlretrieve(d_file, drops_html_file)
     parse_local_data()
@@ -331,6 +331,7 @@ def update_popup():
     l = Label(win, text="Drops URL", anchor=W)
     l.place(x=10, y=10, width=90, height=24)
     d = StringVar()
+    d.set('https://www.warframe.com/droptables')
     de = Entry(win, textvariable=d)
     de.place(x=10+90, y=10, width=256, height=24)
     b = Button(win, text="Update", command=lambda: update_do_closew(d.get(), win))
