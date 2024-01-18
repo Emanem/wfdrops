@@ -111,8 +111,8 @@ class MissionParser(HTMLParser):
                     if items_map[self.cur_item][self.m_type][self.planet].get(self.location, None) is None:
                         items_map[self.cur_item][self.m_type][self.planet][self.location] = {}
                     if items_map[self.cur_item][self.m_type][self.planet][self.location].get(self.rotation, None) is None:
-                        items_map[self.cur_item][self.m_type][self.planet][self.location][self.rotation] = {}
-                    items_map[self.cur_item][self.m_type][self.planet][self.location][self.rotation] = chancef
+                        items_map[self.cur_item][self.m_type][self.planet][self.location][self.rotation] = .0
+                    items_map[self.cur_item][self.m_type][self.planet][self.location][self.rotation] += chancef
                 # reset the item name
                 self.cur_item = ''
 
