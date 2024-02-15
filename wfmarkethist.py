@@ -114,14 +114,7 @@ def db_insert_raw_data(db, all_data):
     return rv_stats
 
 def parse_hist_stats(data):
-    root = html.fromstring(data)
-    # find the hist data section
-    hist_data = None
-    for x in root.getiterator():
-        #print(x.tag, x.attrib) #, x.text, x.tail)
-        if x.tag == 'script' and x.attrib.get('type', None) == 'application/json' and x.attrib.get('id', None) == 'application-state':
-            hist_data = json.loads(x.text)
-            break
+    hist_data = json.loads(data)
     rv = []
     subytpes_r = [None, 'intact', 'basic', 'small', 'revealed', 'blueprint']
     subtype_found = {}
@@ -158,12 +151,14 @@ def get_wfm_webapi(str_url, https_cp):
     return f.data.decode('utf-8')
 
 def get_hist_stats(item_name, https_cp, https_cp_api, query_metadata):
-    str_url = '/items/' + item_name + '/statistics'
-    data = get_wfm_webapi(str_url, https_cp)
+    # sample api historical data
+    # https://api.warframe.market/v1/items/mirage_prime_systems_blueprint/statistics
+    str_url = f'https://api.warframe.market/v1/items/{item_name}/statistics'
+    data = get_wfm_webapi(str_url, https_cp_api)
     tags = []
     if query_metadata:
         time.sleep(G_SLEEP_THROTTLE)
-        str_url = '/v1/items/' + item_name
+        str_url = f'https://api.warframe.market/v1/items/{item_name}'
         data_attrs = get_wfm_webapi(str_url, https_cp_api)
         tags = parse_attrs(data_attrs)
     phs = parse_hist_stats(data)
