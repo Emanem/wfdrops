@@ -150,16 +150,16 @@ def get_wfm_webapi(str_url, https_cp):
     f.read()
     return f.data.decode('utf-8')
 
-def get_hist_stats(item_name, https_cp, https_cp_api, query_metadata):
+def get_hist_stats(item_name, https_cp, query_metadata):
     # sample api historical data
     # https://api.warframe.market/v1/items/mirage_prime_systems_blueprint/statistics
     str_url = f'https://api.warframe.market/v1/items/{item_name}/statistics'
-    data = get_wfm_webapi(str_url, https_cp_api)
+    data = get_wfm_webapi(str_url, https_cp)
     tags = []
     if query_metadata:
         time.sleep(G_SLEEP_THROTTLE)
         str_url = f'https://api.warframe.market/v1/items/{item_name}'
-        data_attrs = get_wfm_webapi(str_url, https_cp_api)
+        data_attrs = get_wfm_webapi(str_url, https_cp)
         tags = parse_attrs(data_attrs)
     phs = parse_hist_stats(data)
     return (phs[0], tags, phs[1])
@@ -175,8 +175,7 @@ def store_hist_data(item_names, force_metadata=False):
     items_tags = db_fetch_names_tags(db) if not force_metadata else {}
     cnt = 0
     # create the HTTPS pool here
-    https_cp = urllib3.HTTPSConnectionPool('warframe.market')
-    https_cp_api = urllib3.HTTPSConnectionPool('api.warframe.market')
+    https_cp = urllib3.HTTPSConnectionPool('api.warframe.market')
     for nm, q_nm in item_names.items():
         cnt += 1
         print("[{count:{fill}{align}{width}}/{total}]".format(count=cnt, total=len(item_names), fill=' ', align='>', width=n_digits), end='\t')
@@ -184,7 +183,7 @@ def store_hist_data(item_names, force_metadata=False):
         tm_start = time.monotonic()
         try:
             # optimization: only query metadata when we don't have tags
-            all_items[nm] = get_hist_stats(q_nm, https_cp, https_cp_api, nm not in items_tags)
+            all_items[nm] = get_hist_stats(q_nm, https_cp, nm not in items_tags)
         except Exception as e:
             print("Error, carrying on (", e, ")")
         else:
@@ -999,8 +998,7 @@ Usage: (options) item1, item2, ...
 
 if __name__ == "__main__":
     # create the HTTPS pool here
-    #https_cp = urllib3.HTTPSConnectionPool('warframe.market')
-    #https_cp_api = urllib3.HTTPSConnectionPool('api.warframe.market')
-    #r = get_hist_stats('mirage_prime_systems', https_cp, https_cp_api, True)
+    #https_cp = urllib3.HTTPSConnectionPool('api.warframe.market')
+    #r = get_hist_stats('mirage_prime_systems', https_cp, True)
     #print(r)
     main()
