@@ -784,7 +784,7 @@ def display_graphs():
 
 def main():
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "gueshx", ["show-tags", "tags=", "force-tags", "update-detail", "update-all", "graphs", "update", "extract", "summary", "summary-days=", "summary-any", "search", "help", "values=", "missing", "no-hist-limit", "x-all"])
+        opts, args = getopt.getopt(sys.argv[1:], "gueshx", ["show-tags", "tags=", "force-tags", "update-detail", "update-all", "graphs", "update", "extract", "summary", "summary-days=", "summary-any", "search", "help", "values=", "missing", "no-hist-limit", "x-all", "throttle="])
     except getopt.GetoptError as err:
         print(err)
         sys.exit(-1)
@@ -888,6 +888,9 @@ Usage: (options) item1, item2, ...
 --missing       Prints the missing names from the market (i.e. names we have in
                 local DB but not anymore in the market)
 
+--throttle t    Sets the sleep throttle when querying WarFrame Market (by default
+                0.5 s)
+
 -h, --help      Displays this help and exit
             ''')
             sys.exit(0)
@@ -915,6 +918,9 @@ Usage: (options) item1, item2, ...
             s_min_price = 0
         elif o in ("--missing"):
             exec_mode = 'i'
+        elif o in ("--throttle"):
+            global G_SLEEP_THROTTLE
+            G_SLEEP_THROTTLE = float(a)
     # args should contain the list of items to extract/update
     if exec_mode == 'g':
         display_graphs()
