@@ -306,30 +306,39 @@ def do_extract_tags():
     filters = ['---']
     return [x for x in rv if (x not in filters)]
 
-def do_summary(n_days=10, min_volume=24, min_price=25, search_nm=[], search_tags=[], tags_andor=True, exclude_sets=True):
+def do_summary(n_days=5, min_volume=24, min_price=25, search_nm=[], search_tags=[], tags_andor=True, exclude_sets=True):
     items_q = ""
     for n in search_nm:
         n_v = re.split(r'\s+', n)
         n = '%'.join(n_v)
-        items_q += "\tOR x.name LIKE '%" + n + "%'\n"
+        items_q += "    OR x.name LIKE '%" + n + "%'\n"
     query = """
-select x.name, x.a_min, x.a_max, x.a_vol
+select x.name, x.price, x.volume, x.change
 from (
-	select 	i.ROWID, i.name, avg(volume) as a_vol, avg(min) as a_min, avg(max) as a_max
-	FROM	items i
-	JOIN	hist h
-	ON		(i.ROWID=h.id)
-	WHERE	1=1
-	AND		h.ts > DATE('now', ?)"""
+    SELECT i.ROWID, i.name, avg(ts_x.price) as price, avg(ts_x.volume) as volume, 100.0 + 100.0*avg(h_max.avg - h_min.avg)/avg(ts_x.price) as 'change'
+    FROM	items i
+    JOIN	(
+        SELECT 	h.id, min(h.ts) as min_ts, max(h.ts) as max_ts, avg(volume) as volume, avg(avg) as price
+        FROM	hist h
+        WHERE	1=1
+        AND		h.ts > DATE('now', ?)
+        GROUP BY	h.id
+    ) ts_x
+    ON		(i.ROWID=ts_x.id)
+    JOIN	hist h_min
+    ON		(i.ROWID=h_min.id AND h_min.ts=ts_x.min_ts)
+    JOIN	hist h_max
+    ON		(i.ROWID=h_max.id AND h_max.ts=ts_x.max_ts)
+    WHERE	1=1"""
     if exclude_sets:
         query += "    AND   NOT i.name LIKE '%set'"
     query += """
     GROUP BY	i.ROWID, i.name
-) x"""
+) x
+"""
     if search_tags:
         count_tags = str(len(search_tags)) if tags_andor else '1'
-        query_tags = """
-JOIN    (
+        query_tags = """JOIN    (
     SELECT  ia.item_id
     FROM    items_attrs ia
     JOIN    tags t
@@ -345,16 +354,15 @@ JOIN    (
 ) t_ ON (x.rowid=t_.item_id)
 """
         query += query_tags
-    query += """
-WHERE	1=1
-AND		x.a_vol >= ?
-AND		x.a_min >= ?
+    query += """WHERE	1=1
+AND		x.volume >= ?
+AND		x.price >= ?
 AND(
     1=?
 """
     query += items_q
     query += """)
-ORDER BY	x.a_min DESC
+ORDER BY	x.price DESC
 """
     interval_q = "-" + str(n_days) + " days"
     db = sqlite3.connect(G_DB_NAME_RO, uri=True)
@@ -662,7 +670,7 @@ class TreeMapWin(Frame):
         self.other_items_val.set(', '.join([x[0] for x in ev])[:2048])
         self.reset_data()
         for e in ev:
-            self.my_tm_data.append({'id':e[0], 'value':(e[1] if self.vol_check.get() == 0 else e[3])})
+            self.my_tm_data.append({'id':e[0], 'value':(e[1] if self.graph_type.get() == "Price" else e[2] if self.graph_type.get() == "Volume" else e[3])})
         self.update_graph()
 
     def update_graph(self, w=0, h=0):
@@ -692,11 +700,11 @@ class TreeMapWin(Frame):
         self.canvas.get_tk_widget().place(x=10, y=self.graph_start_y, width=g_w, height=g_h)
 
     def do_resize(self, w, h):
-        oc_w = w - self.other_items.winfo_x() - self.vol_cb.winfo_width() - 30 - self.btn_tags.winfo_width()
+        oc_w = w - self.other_items.winfo_x() - self.gtype_menu.winfo_width() - 30 - self.btn_tags.winfo_width()
         self.other_items.place(width=oc_w)
         # volume w. checkbox on the right hand side
-        vw_x = w - 10 - self.vol_cb.winfo_width() - 10 - self.btn_tags.winfo_width()
-        self.vol_cb.place(x=vw_x)
+        vw_x = w - 10 - self.gtype_menu.winfo_width() - 10 - self.btn_tags.winfo_width()
+        self.gtype_menu.place(x=vw_x)
         # tag button on the rightmost side
         tagb_x = w - 10 - self.btn_tags.winfo_width()
         self.btn_tags.place(x=tagb_x)
@@ -720,9 +728,11 @@ class TreeMapWin(Frame):
         self.other_items = Label(self, textvariable=self.other_items_val, anchor=W)
         self.other_items.place(x=138+128+10, y=y_plc, height=24)
         # values for the volume weight in the results
-        self.vol_check = IntVar()
-        self.vol_cb = Checkbutton(self, text="Volume", var=self.vol_check, command=self.search_changed)
-        self.vol_cb.place(y=y_plc, height=24)
+        self.graph_type = StringVar()
+        self.graph_type.set("Price")
+        self.graph_type.trace("w", self.search_changed)
+        self.gtype_menu = OptionMenu(self, self.graph_type, "Price", "Volume", "Price Chng %")
+        self.gtype_menu.place(y=y_plc, width=128, height=24)
         # button to display pop-up to set tags
         self.btn_tags = Button(self, text="Select tags", command=self.btn_tags)
         self.btn_tags.place(y=y_plc, height=24)
@@ -790,7 +800,7 @@ def main():
         sys.exit(-1)
     exec_mode = 'u'
     extract_values = ['volume', 'min', 'max', 'open', 'close', 'avg', 'w_avg', 'median', 'm_avg']
-    s_n_days = 10
+    s_n_days = 5
     s_min_volume = 24
     s_min_price = 25
     update_all = False
@@ -868,9 +878,9 @@ Usage: (options) item1, item2, ...
 
 -s, --search    Search remote warframe market for given items
 
--x, --summary   Quickly print a summary of averaged volumes, min/max prices on the
-                last 10 days from today, ordered by min price descending (no other
-                input paramater needed, would be ignored)
+-x, --summary   Quickly print a summary of averaged volumes, avg prices and % price
+                changes on the last 5 days from today, ordered by min price 
+                descending (no other input paramater needed, would be ignored)
                 By default only items whose average volume >= 24 and average
                 min price >= 25 will be reported
 
@@ -983,7 +993,7 @@ Usage: (options) item1, item2, ...
             print(i)
     elif exec_mode == 'm':
         rv = do_summary(n_days=s_n_days, min_volume=s_min_volume, min_price=s_min_price, search_tags=tags, exclude_sets=not do_summary_sets)
-        print("name,avg min price,avg max price,avg volume")
+        print("name,avg price,avg volume,price change %")
         for v in rv:
             print(v[0], v[1], v[2], v[3], sep=',')
     elif exec_mode == 't':
