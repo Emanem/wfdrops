@@ -801,8 +801,8 @@ def main():
     exec_mode = 'u'
     extract_values = ['volume', 'min', 'max', 'open', 'close', 'avg', 'w_avg', 'median', 'm_avg']
     s_n_days = 5
-    s_min_volume = 24
-    s_min_price = 25
+    s_min_volume = 10
+    s_min_price = 10
     update_all = False
     update_detail = False
     force_tags = False
@@ -881,8 +881,8 @@ Usage: (options) item1, item2, ...
 -x, --summary   Quickly print a summary of averaged volumes, avg prices and % price
                 changes on the last 5 days from today, ordered by min price 
                 descending (no other input paramater needed, would be ignored)
-                By default only items whose average volume >= 24 and average
-                min price >= 25 will be reported
+                By default only items whose average volume >= 10 and average
+                min price >= 10 will be reported
 
 --x-all         As per above '-x' but also includes 'sets'
 
@@ -992,7 +992,7 @@ Usage: (options) item1, item2, ...
         for i in l_items.keys():
             print(i)
     elif exec_mode == 'm':
-        rv = do_summary(n_days=s_n_days, min_volume=s_min_volume, min_price=s_min_price, search_tags=tags, exclude_sets=not do_summary_sets)
+        rv = do_summary(n_days=s_n_days, min_volume=s_min_volume, min_price=s_min_price, search_nm=args, search_tags=tags, exclude_sets=not do_summary_sets)
         print("name,avg price,avg volume,price change %")
         for v in rv:
             print(v[0], v[1], v[2], v[3], sep=',')
