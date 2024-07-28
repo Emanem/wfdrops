@@ -315,7 +315,7 @@ def do_summary(n_days=5, min_volume=24, min_price=25, search_nm=[], search_tags=
     query = """
 select x.name, x.price, x.volume, x.change
 from (
-    SELECT i.ROWID, i.name, avg(ts_x.price) as price, avg(ts_x.volume) as volume, 100.0 + 100.0*avg(h_max.avg - h_min.avg)/avg(ts_x.price) as 'change'
+    SELECT i.ROWID, i.name, avg(ts_x.price) as price, avg(ts_x.volume) as volume, 100.0 + 100.0*avg((h_max.avg - h_min.avg)/h_min.avg) as 'change'
     FROM	items i
     JOIN	(
         SELECT 	h.id, min(h.ts) as min_ts, max(h.ts) as max_ts, avg(volume) as volume, avg(avg) as price
