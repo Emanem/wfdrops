@@ -635,9 +635,9 @@ class TreeMapWin(Frame):
         self.create_widgets()
 
     def get_color(self, cur_value):
-        if (self.max_value - self.min_value) == 0.0:
-            return self.max_color
-        sf = 1.0 - (self.max_value - cur_value)/(self.max_value - self.min_value)
+        sf = 0.5
+        if (self.max_value - self.min_value) != 0.0:
+            sf = 1.0 - (self.max_value - cur_value)/(self.max_value - self.min_value)
         r_sf = []
         for i in range(3):
             r_sf.append(self.min_color[i] + (self.max_color[i] - self.min_color[i])*sf)
@@ -653,7 +653,7 @@ class TreeMapWin(Frame):
 
     def search_changed(self, *args):
         v = self.search_val.get()
-        if len(v) <= 0 and not self.tags:
+        if len(v.strip()) < 3 and not self.tags:
             self.other_items_val.set("")
             self.reset_data()
             self.update_graph()
