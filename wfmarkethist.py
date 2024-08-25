@@ -90,7 +90,15 @@ def db_fetch_names_tags(db):
         rv[i[0]] = i[1]
     return rv
 
+def db_fetch_max_ts(db):
+    cur = db.cursor()
+    ri = cur.execute("SELECT CAST(JULIANDAY('now') - JULIANDAY(MAX(ts)) as INT) FROM " + G_DB_ITEMS_HIST + " WHERE 1=1")
+    for i in ri:
+        return i[0]
+    return sys.maxsize
+
 def db_insert_raw_data(db, all_data):
+    cur_max_ts_interval = db_fetch_max_ts(db)
     nm_id = db_fetch_names(db, G_DB_ITEMS_NAME, all_data.keys())
     cur = db.cursor()
     rv_stats = {}
@@ -111,7 +119,7 @@ def db_insert_raw_data(db, all_data):
         for r in v[1]:
             cur.execute("INSERT INTO " + G_DB_ITEMS_TAGS + "(item_id, tag_id) SELECT ?, ? WHERE NOT EXISTS (SELECT 1 FROM " + G_DB_ITEMS_TAGS + " WHERE item_id=? and tag_id=?)", (nm_id[k], cur_tags[r], nm_id[k], cur_tags[r]))
     db.commit()
-    return rv_stats
+    return rv_stats, cur_max_ts_interval
 
 def parse_hist_stats(data):
     hist_data = json.loads(data)
@@ -196,7 +204,7 @@ def store_hist_data(item_names, force_metadata=False):
             if sleep_throttle > 0.0:
                 time.sleep(sleep_throttle)
     # perform insertion of all data
-    rv = db_insert_raw_data(db, all_items)
+    rv, max_ts_interval = db_insert_raw_data(db, all_items)
     db.close()
     # prepare return query stats and
     # warning items
@@ -206,7 +214,7 @@ def store_hist_data(item_names, force_metadata=False):
         rv_q[nm] = len(all_items[nm][0])
         if bool(all_items[nm][2]):
             rv_subtypes[nm] = all_items[nm][2]
-    return (rv, rv_q, rv_subtypes)
+    return (rv, rv_q, rv_subtypes, max_ts_interval)
 
 def get_items_list(search_nm, get_all=False):
     str_url = '/v1/items'
@@ -939,7 +947,7 @@ Usage: (options) item1, item2, ...
         print("\tAdding/Updating:")
         for i in items.keys():
             print(i)
-        rv, rv_q, rv_subt = store_hist_data(items, force_tags)
+        rv, rv_q, rv_subt, max_ts_interval = store_hist_data(items, force_tags)
         if update_detail:
             print("\tEntries added:")
             for i in rv:
@@ -964,6 +972,11 @@ Usage: (options) item1, item2, ...
             if v not in dist:
                 dist[v] = 0
             dist[v] = dist[v] + 1
+            # this is also true if an item
+            # suddenly has a longer history since
+            # we run the latest update
+            if (v >= max_ts_interval):
+                rv_w[k] = v
         for i in sorted(dist):
             print(i, "->", dist[i])
         # check if we have to print any warning
