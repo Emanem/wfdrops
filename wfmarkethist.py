@@ -19,43 +19,6 @@ from matplotlib import cm
 from matplotlib import colors
 import random
 
-# sqlite3 converter (mandatory since python 3.12)
-# https://docs.python.org/3/library/sqlite3.html#sqlite3-adapter-converter-recipes
-
-def adapt_date_iso(val):
-    """Adapt datetime.date to ISO 8601 date."""
-    return val.isoformat()
-
-def adapt_datetime_iso(val):
-    """Adapt datetime.datetime to timezone-naive ISO 8601 date."""
-    return val.isoformat()
-
-def adapt_datetime_epoch(val):
-    """Adapt datetime.datetime to Unix timestamp."""
-    return int(val.timestamp())
-
-sqlite3.register_adapter(datetime.date, adapt_date_iso)
-sqlite3.register_adapter(datetime.datetime, adapt_datetime_iso)
-sqlite3.register_adapter(datetime.datetime, adapt_datetime_epoch)
-
-def convert_date(val):
-    """Convert ISO 8601 date to datetime.date object."""
-    return datetime.date.fromisoformat(val.decode())
-
-def convert_datetime(val):
-    """Convert ISO 8601 datetime to datetime.datetime object."""
-    return datetime.datetime.fromisoformat(val.decode())
-
-def convert_timestamp(val):
-    """Convert Unix epoch timestamp to datetime.datetime object."""
-    return datetime.datetime.fromtimestamp(int(val))
-
-sqlite3.register_converter("date", convert_date)
-sqlite3.register_converter("datetime", convert_datetime)
-sqlite3.register_converter("timestamp", convert_timestamp)
-
-# end registration of converters
-
 G_DB_NAME = "wf_mkt_hist.db"
 G_DB_NAME_RO = "file:" + G_DB_NAME + "?mode=ro"
 G_DB_ITEMS_NAME = "items"
@@ -116,7 +79,7 @@ def db_fetch_ts(db, nm_id):
     ri = cur.execute("SELECT ts FROM " + G_DB_ITEMS_HIST + " WHERE 1=1 AND id=? GROUP BY ts", (nm_id,))
     rv = {}
     for i in ri:
-        rv[i[0]] = 1
+        rv[datetime.datetime.fromisoformat(i[0])] = 1
     return rv
 
 def db_fetch_names_tags(db):
