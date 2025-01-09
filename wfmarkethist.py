@@ -116,7 +116,7 @@ def db_fetch_ts(db, nm_id):
     ri = cur.execute("SELECT ts FROM " + G_DB_ITEMS_HIST + " WHERE 1=1 AND id=? GROUP BY ts", (nm_id,))
     rv = {}
     for i in ri:
-        rv[datetime.datetime.fromisoformat(i[0])] = 1
+        rv[i[0]] = 1
     return rv
 
 def db_fetch_names_tags(db):
