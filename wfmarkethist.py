@@ -154,7 +154,7 @@ def parse_attrs(data):
     return list(rv.keys())
 
 def get_wfm_webapi(str_url, https_cp):
-    f = https_cp.urlopen('GET', str_url, headers={'User-Agent': G_WFM_USER_AGENT})
+    f = https_cp.urlopen('GET', str_url, headers={'User-Agent': G_WFM_USER_AGENT, 'crossplay' : 'true'})
     f.read()
     return f.data.decode('utf-8')
 
