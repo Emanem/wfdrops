@@ -121,7 +121,7 @@ def db_insert_raw_data(db, all_data):
     db.commit()
     return rv_stats, cur_max_ts_interval
 
-def parse_hist_stats(data):
+def parse_hist_stats(data, item_name):
     hist_data = json.loads(data)
     rv = []
     subytpes_r = [None, 'intact', 'basic', 'small', 'revealed', 'blueprint']
@@ -131,6 +131,11 @@ def parse_hist_stats(data):
             # skip fully upgraded mods
             if x.get('mod_rank', 0) != 0:
                 continue
+            # check if there's 'cyan_stars' and 'amber_stars' and if so
+            # ensure those are 2 and 1 and the name of the item is ayatan*sculpture
+            if re.match(r'^ayatan.*sculpture$', item_name, re.IGNORECASE):
+                if x.get('cyan_stars', 0) != 2 or x.get('amber_stars', 0) != 1:
+                    continue
             # skip non 'intact' relics or fishes
             # use the list for other types
             if x.get('subtype', None) not in subytpes_r:
@@ -142,7 +147,10 @@ def parse_hist_stats(data):
     for x in rv:
         uniq_dates[x[0]] = None
     if len(uniq_dates) != len(rv):
-        raise ValueError('Current item may have multiple valid subptypes yielding to duplicate data')
+        fname = f'{item_name}.json'
+        with open(fname, 'w') as f:
+            f.write(data)
+        raise ValueError(f'Current item may have multiple valid subptypes yielding to duplicate data (json file saved as {fname})')
     return (rv, subtype_found)
 
 def parse_attrs(data):
@@ -169,7 +177,7 @@ def get_hist_stats(item_name, https_cp, query_metadata):
         str_url = f'https://api.warframe.market/v1/items/{item_name}'
         data_attrs = get_wfm_webapi(str_url, https_cp)
         tags = parse_attrs(data_attrs)
-    phs = parse_hist_stats(data)
+    phs = parse_hist_stats(data, item_name)
     return (phs[0], tags, phs[1])
 
 def store_hist_data(item_names, force_metadata=False):
