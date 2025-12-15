@@ -156,9 +156,8 @@ def parse_hist_stats(data, item_name):
 def parse_attrs(data):
     jdata = json.loads(data)
     rv = {}
-    for x in jdata['payload']['item']['items_in_set']:
-        for y in x['tags']:
-            rv[y.lower()] = 1
+    for y in jdata['data']['tags']:
+        rv[y.lower()] = 1
     return list(rv.keys())
 
 def get_wfm_webapi(str_url, https_cp):
@@ -168,13 +167,13 @@ def get_wfm_webapi(str_url, https_cp):
 
 def get_hist_stats(item_name, https_cp, query_metadata):
     # sample api historical data
-    # https://api.warframe.market/v1/items/mirage_prime_systems_blueprint/statistics
+    # https://api.warframe.market/v2/items/mirage_prime_systems_blueprint/statistics
     str_url = f'https://api.warframe.market/v1/items/{item_name}/statistics'
     data = get_wfm_webapi(str_url, https_cp)
     tags = []
     if query_metadata:
         time.sleep(G_SLEEP_THROTTLE)
-        str_url = f'https://api.warframe.market/v1/items/{item_name}'
+        str_url = f'https://api.warframe.market/v2/items/{item_name}'
         data_attrs = get_wfm_webapi(str_url, https_cp)
         tags = parse_attrs(data_attrs)
     phs = parse_hist_stats(data, item_name)
@@ -225,23 +224,23 @@ def store_hist_data(item_names, force_metadata=False):
     return (rv, rv_q, rv_subtypes, max_ts_interval)
 
 def get_items_list(search_nm, get_all=False):
-    str_url = '/v1/items'
+    str_url = '/v2/items'
     https_cp = urllib3.HTTPSConnectionPool('api.warframe.market')
     data = get_wfm_webapi(str_url, https_cp)
     jdata = json.loads(data)
     if get_all:
         rv = {}
-        for k in jdata['payload']['items']:
-            rv[uniform_str(k['item_name'])] = k['url_name']
+        for k in jdata['data']:
+            rv[uniform_str(k['i18n']['en']['name'])] = k['slug']
         return rv
     r_items = []
     for s in search_nm:
         r_items.append(re.compile(r'.*' + re.escape(s.strip()) + r'.*', re.IGNORECASE))
     rv = {}
-    for k in jdata['payload']['items']:
+    for k in jdata['data']:
         for r_i in r_items:
-            if r_i.match(k['item_name']) is not None:
-                rv[uniform_str(k['item_name'])] = k['url_name']
+            if r_i.match(k['i18n']['en']['name']) is not None:
+                rv[uniform_str(k['i18n']['en']['name'])] = k['slug']
     return rv
 
 def do_extract(search_nm, e_values, *, tags=[], wildcard_ws=False, n_days=G_N_DAYS_HIST):
@@ -1036,6 +1035,6 @@ Usage: (options) item1, item2, ...
 if __name__ == "__main__":
     # create the HTTPS pool here
     #https_cp = urllib3.HTTPSConnectionPool('api.warframe.market')
-    #r = get_hist_stats('mirage_prime_systems', https_cp, True)
+    #r = get_hist_stats('arcane_persistence', https_cp, True)
     #print(r)
     main()
