@@ -26,7 +26,7 @@ G_DB_ITEMS_HIST = "hist"
 G_DB_TAGS_NAME = "tags"
 G_DB_ITEMS_TAGS = "items_attrs"
 G_WFM_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36'
-G_SLEEP_THROTTLE = 0.5
+G_SLEEP_THROTTLE = 0.34 # for now it's 3 requests per second
 G_N_DAYS_HIST = 365
 
 def uniform_str(s):
@@ -99,6 +99,8 @@ def db_fetch_max_ts(db):
 
 def db_insert_raw_data(db, all_data):
     cur_max_ts_interval = db_fetch_max_ts(db)
+    if not cur_max_ts_interval:
+        cur_max_ts_interval = 0
     nm_id = db_fetch_names(db, G_DB_ITEMS_NAME, all_data.keys())
     cur = db.cursor()
     rv_stats = {}
