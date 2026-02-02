@@ -747,7 +747,7 @@ class TreeMapWin(Frame):
         # values for the volume weight in the results
         self.graph_type = StringVar()
         self.graph_type.set("Price")
-        self.graph_type.trace("w", self.search_changed)
+        self.graph_type.trace_add("write", self.search_changed)
         self.gtype_menu = OptionMenu(self, self.graph_type, "Price", "Volume", "Price Chng %")
         self.gtype_menu.place(y=y_plc, width=128, height=24)
         # button to display pop-up to set tags
