@@ -112,7 +112,7 @@ def db_insert_raw_data(db, all_data):
         for r in v[0]:
             if r[0] in all_ts.keys():
                 continue
-            cur.execute("INSERT INTO " + G_DB_ITEMS_HIST + " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (nm_id[k], r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9]))
+            cur.execute("INSERT INTO " + G_DB_ITEMS_HIST + " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (nm_id[k], r[0].isoformat(" "), r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9]))
             rv_stats[k] = rv_stats[k]+1
         # push all the tags - we're fetching more than
         # required but it's ok for now
